@@ -8,7 +8,7 @@ import { AuthenticationError } from '../errors/AuthenticationError';
 import { sendVerificationEmail } from '../utils/emailSender';
 import { BadRequestError } from '../errors/BadRequestError'; 
 import { NotFoundError } from '../errors/NotFoundError';
-
+import { ConflictError } from '../errors/ConflictError'; 
 
 // Define the fields we want to exclude from the public User object
 type SensitiveUserFields = 'password'
@@ -803,4 +803,135 @@ export const getUserProfile = async (userId: string): Promise<PublicUserProfile>
     // if you use `Omit` in your type definition.
 
     return publicProfile as PublicUserProfile;
+};
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+/**
+ * API: Update User Settings
+ * @description Updates the settings for the current user, handling re-hashing,
+ * uniqueness checks, and re-verification upon email change.
+ * @param userId The ID of the authenticated user.
+ * @param settingsData The partial user data to update.
+ * @returns The updated user object with sensitive fields excluded.
+ */
+export const updateUserSettings = async (userId: string, settingsData: Partial<User>): Promise<Omit<User, SensitiveUserFields>> => {
+    const saltRounds = 10;
+    const OTP_EXPIRY_MINUTES = 15;
+    const updatePayload: Partial<User> = {};
+    
+    // 1. Find Current User for comparison
+    const currentUser = await prisma.user.findUnique({
+        where: { id: userId },
+    });
+
+    if (!currentUser) {
+        // Should be caught by authMiddleware, but a safeguard.
+        throw new AuthenticationError('Authenticated user not found.', 404);
+    }
+    
+    // 2. Conditional Updates and Validation
+
+    // --- A. Password Change ---
+    if (settingsData.password && settingsData.password !== currentUser.password) {
+        if (settingsData.password.length < 6) { // Weak password check
+            throw new BadRequestError('New password must be at least 6 characters long.', 400);
+        }
+        updatePayload.password = await bcrypt.hash(settingsData.password, saltRounds);
+    }
+
+    // --- B. Username Change ---
+    if (settingsData.username && settingsData.username.toLowerCase() !== currentUser.username.toLowerCase()) {
+        const cleanedUsername = cleanIdentifier(settingsData.username);
+        
+        // Uniqueness check (case-insensitive)
+        const existingUser = await prisma.user.findFirst({
+            where: { username: { equals: cleanedUsername, mode: 'insensitive' } },
+        });
+
+        if (existingUser) {
+            // Assuming ConflictError is defined for 409 status code
+            throw new ConflictError('Username is already taken.', 409);
+        }
+        updatePayload.username = cleanedUsername;
+    }
+    
+    // --- C. Email Change (Most Complex) ---
+    if (settingsData.email && settingsData.email.toLowerCase() !== currentUser.email.toLowerCase()) {
+        const cleanedEmail = cleanIdentifier(settingsData.email).toLowerCase();
+
+        // Uniqueness check (case-insensitive)
+        const existingEmailUser = await prisma.user.findFirst({
+            where: { email: cleanedEmail },
+        });
+        
+        if (existingEmailUser) {
+            throw new ConflictError('Email address is already registered.', 409);
+        }
+
+        // Action 1: Set new email
+        updatePayload.email = cleanedEmail;
+        
+        // Action 2: Reset verification status
+        updatePayload.isVerified = false; 
+        
+        // Action 3: Generate, Hash, and Store New OTP
+        const rawOtp = generateOtp();
+        const hashedOtp = await bcrypt.hash(rawOtp, saltRounds); 
+        const otpExpiry = new Date();
+        otpExpiry.setMinutes(otpExpiry.getMinutes() + OTP_EXPIRY_MINUTES);
+        
+        updatePayload.verificationOtp = hashedOtp;
+        updatePayload.verificationOtpExpiry = otpExpiry;
+
+        // Action 4 (Side Effect): Send verification email to the new address
+        await sendVerificationEmail(cleanedEmail, rawOtp);
+    }
+    
+    // --- D. General Field Updates ---
+    // Copy all other fields that are valid to update (e.g., avatarUrl, name, etc.)
+    // We explicitly avoid iterating over the security/identity fields we already checked.
+    const nonSensitiveUpdateKeys = ['name', 'avatarUrl', 'address', 'city', 'zipCode'] as const;
+
+    for (const key of nonSensitiveUpdateKeys) {
+        if (settingsData[key] !== undefined) {
+            updatePayload[key] = settingsData[key];
+        }
+    }
+
+
+    // 3. Final Update and Auditing
+    if (Object.keys(updatePayload).length === 0) {
+        // Nothing to update
+        return currentUser as Omit<User, SensitiveUserFields>;
+    }
+    
+    const updatedUser = await prisma.$transaction(async (tx) => {
+        const result = await tx.user.update({
+            where: { id: userId },
+            data: updatePayload,
+        });
+        
+        // Auditing
+        await tx.activityLog.create({
+            data: {
+                userId: userId,
+                action: 'USER_SETTINGS_UPDATE',
+                details: `Updated fields: ${Object.keys(updatePayload).join(', ')}`,
+            }
+        });
+        return result;
+    });
+
+    // 4. Prepare Response (Excluding sensitive fields)
+    const {
+        password: _, verificationOtp: __, verificationOtpExpiry: ___, 
+        passwordResetOtp: ____, passwordResetOtpExpiry: _____, 
+        banReason: ______, banStartDate: _______,
+        ...userWithoutSensitiveFields
+    } = updatedUser;
+
+    return userWithoutSensitiveFields;
 };
