@@ -1,0 +1,522 @@
+// schema.prisma
+
+/**
+ * @file This file contains the Prisma schema definition for the Social Marketplace backend.
+ * * NOTE: This is the actual schema.prisma file used by the Prisma ORM. 
+ * It serves as a central, version-controlled definition of the database structure, 
+ * optimized for performance and data integrity.
+ */
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum UserRole {
+  SuperAdmin
+  Admin
+  Member
+}
+
+enum CategoryType {
+  discussion
+  advert
+}
+
+enum PostCondition {
+  New
+  UsedLikeNew
+  UsedGood
+  UsedFair
+}
+
+enum TransactionStatus {
+  Pending
+  Completed
+  InEscrow
+  Shipped
+  Delivered
+  Disputed
+  Cancelled
+}
+
+enum DisputeStatus {
+  Open
+  Resolved
+  AwaitingReturn
+  ReturnShipped
+  Closed
+}
+
+enum UserReportStatus {
+  Open
+  UnderReview
+  Resolved
+}
+
+enum NotificationType {
+  like
+  comment_like
+  comment
+  follow
+  system
+  post
+  follow_request
+  mention
+  followed_post_comment
+}
+
+// =============================================================================
+// MODELS
+// =============================================================================
+
+/// Represents a user account in the system.
+model User {
+  id                        String       @id @default(cuid())
+  username                  String       @unique
+  password                  String
+  email                     String       @unique
+  role                      UserRole     @default(Member)
+  name                      String
+  avatarUrl                 String?
+  address                   String?
+  city                      String?
+  zipCode                   String?
+  isActive                  Boolean      @default(true)
+  banExpiresAt              DateTime?
+  banReason                 String?
+  banStartDate              DateTime?
+  isVerified                Boolean      @default(false)
+  lastSeen                  DateTime?    @updatedAt
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+
+  // Authentication & Security Fields
+  verificationOtp           String?
+  verificationOtpExpiry     DateTime?
+  passwordResetOtp          String?
+  passwordResetOtpExpiry    DateTime?
+
+  // Social Graph (Many-to-Many)
+  following                 User[]       @relation("UserFollows")
+  followers                 User[]       @relation("UserFollows")
+  blockedUsers              User[]       @relation("UserBlocks")
+  blockedBy                 User[]       @relation("UserBlocks")
+  pendingFollowers          User[]       @relation("PendingFollows")
+  pendingFollowing          User[]       @relation("PendingFollows")
+
+  // User-specific data
+  savedStickers             String[]
+  followedPosts             Post[]       @relation("PostFollows")
+
+  // Financial Information
+  bankAccount               BankAccount?
+
+  // Content created by the user
+  posts                     Post[]
+  comments                  Comment[]
+
+  // User interactions with content
+  likedPosts                Post[]       @relation("PostLikes")
+  dislikedPosts             Post[]       @relation("PostDislikes")
+  likedComments             Comment[]    @relation("CommentLikes")
+  dislikedComments          Comment[]    @relation("CommentDislikes")
+  flaggedPosts              Post[]       @relation("PostFlags")
+  flaggedComments           Comment[]    @relation("CommentFlags")
+
+  // Transactional and Dispute roles
+  transactionsAsBuyer       Transaction[] @relation("BuyerTransactions")
+  transactionsAsSeller      Transaction[] @relation("SellerTransactions")
+  disputesAsBuyer           Dispute[]    @relation("BuyerDisputes")
+  disputesAsSeller          Dispute[]    @relation("SellerDisputes")
+  reviewsGiven              Review[]     @relation("ReviewsGiven")
+  reviewsReceived           Review[]     @relation("ReviewsReceived")
+  
+  // Reporting and Moderation
+  reportsMade               UserReport[] @relation("ReportsMade")
+  reportsReceived           UserReport[] @relation("ReportsReceived")
+  disputesResolved          Dispute[]    @relation("DisputesResolvedByAdmin")
+  reportsResolved           UserReport[] @relation("ReportsResolvedByAdmin")
+  adminActions              AdminAction[] @relation("AdminActions")
+
+  // Messaging
+  chatsAsBuyer              Chat[]       @relation("BuyerChats")
+  chatsAsSeller             Chat[]       @relation("SellerChats")
+  messagesSent              Message[]
+
+  // Notifications
+  notifications             Notification[] @relation("UserNotifications")
+  notificationsSent         Notification[] @relation("ActorNotifications")
+  
+  // Auditing
+  activityLog               ActivityLog[]
+}
+
+/// Stores a user's bank account details for payouts from sales.
+model BankAccount {
+  id            String @id @default(cuid())
+  accountName   String
+  accountNumber String
+  bankName      String
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String @unique
+}
+
+/// Represents a review given by one user to another, usually after a transaction.
+model Review {
+  id                String      @id @default(cuid())
+  rating            Int
+  comment           String
+  timestamp         DateTime    @default(now())
+  isVerifiedPurchase Boolean   @default(false)
+
+  // A review is given by a 'reviewer'.
+  reviewer          User        @relation("ReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewerId        String
+
+  // A review is received by a 'user'.
+  user              User        @relation("ReviewsReceived", fields: [userId], references: [id], onDelete: Cascade)
+  userId            String
+
+  // Optionally linked to a transaction to mark it as a 'Verified Purchase'.
+  transaction       Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  transactionId     String?     @unique
+
+  @@index([reviewerId])
+  @@index([userId])
+}
+
+/// Represents a post, which can be a discussion topic or an advertisement.
+model Post {
+  id                      String         @id @default(cuid())
+  title                   String
+  content                 String         @db.Text
+  timestamp               DateTime       @default(now())
+  lastActivityTimestamp   DateTime       @default(now())
+  editedTimestamp         DateTime?
+  isAdvert                Boolean
+  price                   Float?
+  isSoldOut               Boolean        @default(false)
+  quantity                Int?
+  brand                   String?
+  condition               PostCondition?
+  deliveryOptions         Json?
+  pinnedAt                DateTime?
+  isCommentingRestricted  Boolean        @default(false)
+
+  /// Media attachments for the post. For images, this should store an object with:
+  /// - type: "image"
+  /// - url: string (fallback URL)
+  /// - placeholder: string (base64 data URI for LQIP)
+  /// - srcset_webp: string (e.g., "img.webp 300w, img_large.webp 800w")
+  /// - srcset_jpeg: string (e.g., "img.jpg 300w, img_large.jpg 800w")
+  /// For videos, it should store { type: "video", url: "...", thumbnailUrl: "..." }
+  media                   Json?
+
+  authorId                String
+  author                  User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  categoryId              String
+  category                Category       @relation(fields: [categoryId], references: [id])
+
+  comments                Comment[]
+
+  // Many-to-Many relations for user interactions
+  likedBy                 User[]         @relation("PostLikes")
+  dislikedBy              User[]         @relation("PostDislikes")
+  flaggedBy               User[]         @relation("PostFlags")
+  followedBy              User[]         @relation("PostFollows")
+  
+  // Associated entities
+  transactions            Transaction[]
+  chats                   Chat[]
+  notifications           Notification[]
+  
+  @@index([authorId])
+  @@index([categoryId])
+}
+
+/// Organizes posts into categories like 'Technology' or 'Furniture for Sale'.
+model Category {
+  id            String       @id @default(cuid())
+  name          String       @unique
+  description   String
+  type          CategoryType
+  
+  posts         Post[]
+}
+
+/// Represents a comment on a post, with support for nested replies.
+model Comment {
+  id              String      @id @default(cuid())
+  content         String      @db.Text
+  timestamp       DateTime    @default(now())
+  editedTimestamp DateTime?
+  
+  /// Media attachments for the comment. See Post model for the expected JSON structure.
+  media           Json?
+
+  authorId        String
+  author          User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  postId          String
+  post            Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // Self-relation for threaded replies
+  parentId        String?
+  parent          Comment?    @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies         Comment[]   @relation("CommentReplies")
+
+  // Many-to-Many relations for user interactions
+  likedBy         User[]      @relation("CommentLikes")
+  dislikedBy      User[]      @relation("CommentDislikes")
+  flaggedBy       User[]      @relation("CommentFlags")
+  
+  @@index([authorId])
+  @@index([postId])
+  @@index([parentId])
+}
+
+/// Tracks a transaction between a buyer and a seller for an item.
+model Transaction {
+  id                     String            @id @default(cuid())
+  status                 TransactionStatus
+  date                   DateTime          @default(now())
+  amount                 Float
+  deliveryFee            Float?
+  trackingNumber         String?
+  shippingProof          Json?
+  inspectionPeriodEnds   DateTime?
+  shippedAt              DateTime?
+  deliveredAt            DateTime?
+  completedAt            DateTime?
+  cancelledAt            DateTime?
+  failureReason          String?
+  refundedAmount         Float?
+
+  postId                 String?
+  post                   Post?             @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  buyerId                String
+  buyer                  User              @relation("BuyerTransactions", fields: [buyerId], references: [id], onDelete: Restrict)
+
+  sellerId               String
+  seller                 User              @relation("SellerTransactions", fields: [sellerId], references: [id], onDelete: Restrict)
+  
+  dispute                Dispute?
+  reviews                Review[]
+  adminActions           AdminAction[]
+  notifications          Notification[]
+  chats                  Chat[]
+  
+  @@index([postId])
+  @@index([buyerId])
+  @@index([sellerId])
+}
+
+/// Handles disputes raised for a transaction.
+model Dispute {
+  id                     String          @id @default(cuid())
+  reason                 String
+  status                 DisputeStatus
+  openedDate             DateTime        @default(now())
+  chatHistory            Json
+  resolution             Json? // Can be nullified if a Super Admin re-opens the dispute.
+  returnTrackingNumber   String?
+  returnProof            Json?
+
+  transactionId          String          @unique
+  transaction            Transaction     @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  buyerId                String
+  buyer                  User            @relation("BuyerDisputes", fields: [buyerId], references: [id], onDelete: Restrict)
+
+  sellerId               String
+  seller                 User            @relation("SellerDisputes", fields: [sellerId], references: [id], onDelete: Restrict)
+
+  resolvedByAdminId      String?
+  resolvedByAdmin        User?           @relation("DisputesResolvedByAdmin", fields: [resolvedByAdminId], references: [id], onDelete: SetNull)
+  
+  notifications          Notification[]
+  
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([resolvedByAdminId])
+}
+
+/// Represents a private conversation between two users.
+model Chat {
+  id                     String    @id @default(cuid())
+  lastMessage            String
+  lastMessageTimestamp   DateTime
+
+  postId                 String?
+  post                   Post?     @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  transactionId          String?
+  transaction            Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  buyerId                String
+  buyer                  User      @relation("BuyerChats", fields: [buyerId], references: [id], onDelete: Cascade)
+  
+  sellerId               String
+  seller                 User      @relation("SellerChats", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  messages               Message[]
+  notifications          Notification[]
+  
+  @@index([postId])
+  @@index([transactionId])
+  @@index([buyerId])
+  @@index([sellerId])
+}
+
+/// An individual message within a chat.
+model Message {
+  id            String   @id @default(cuid())
+  timestamp     DateTime @default(now())
+  text          String?  @db.Text
+  stickerUrl    String?
+  voiceNote     Json?
+  attachment    Json?
+  replyTo       Json?
+  isForwarded   Boolean  @default(false)
+  deletedFor    String[]
+
+  chatId        String
+  chat          Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  senderId      String
+  sender        User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  
+  @@index([chatId])
+  @@index([senderId])
+}
+
+/// Represents a notification sent to a user for various events.
+model Notification {
+  id            String           @id @default(cuid())
+  type          NotificationType
+  content       String
+  link          String
+  timestamp     DateTime         @default(now())
+  read          Boolean          @default(false)
+
+  userId        String
+  user          User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  actorId       String?
+  actor         User?            @relation("ActorNotifications", fields: [actorId], references: [id], onDelete: Cascade)
+
+  // A notification is usually related to one of these entities
+  postId        String?
+  post          Post?            @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  transactionId String?
+  transaction   Transaction?     @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  chatId        String?
+  chat          Chat?            @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  disputeId     String?
+  dispute       Dispute?         @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  userReportId  String?
+  userReport    UserReport?      @relation(fields: [userReportId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([actorId])
+  @@index([postId])
+}
+
+/// A report filed by one user against another.
+model UserReport {
+  id                String           @id @default(cuid())
+  reason            String
+  details           String
+  attachment        Json?
+  timestamp         DateTime         @default(now())
+  status            UserReportStatus
+  resolutionNotes   String?
+  
+  reporterId        String
+  reporter          User             @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  
+  reportedUserId    String
+  reportedUser      User             @relation("ReportsReceived", fields: [reportedUserId], references: [id], onDelete: Cascade)
+
+  resolvedBy        String?
+  resolvedByAdmin   User?            @relation("ReportsResolvedByAdmin", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  notifications     Notification[]
+  
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([resolvedBy])
+}
+
+/// Logs significant actions performed by a user for auditing.
+model ActivityLog {
+  id          String   @id @default(cuid())
+  action      String
+  details     String
+  timestamp   DateTime @default(now())
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+}
+
+/// Logs administrative actions on transactions, providing an audit trail.
+model AdminAction {
+  id             String     @id @default(cuid())
+  action         String     // e.g., "Forced Payout", "Re-open Dispute"
+  timestamp      DateTime   @default(now())
+  details        String?
+  originalStatus String?
+
+  adminId        String
+  admin          User       @relation("AdminActions", fields: [adminId], references: [id], onDelete: Restrict)
+
+  transactionId  String
+  transaction    Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  @@index([adminId])
+  @@index([transactionId])
+}
+
+/// A singleton table containing global feature flags and settings for the platform.
+/// The backend MUST ensure only one row ever exists in this table. On update requests,
+/// the single record should be fetched and modified. On first run, it should be created.
+model BackofficeSettings {
+  id                   String   @id @default(cuid())
+  maintenanceMode      Boolean  @default(false)
+  enablePostCreation   Boolean  @default(true)
+  enableAdvertisements Boolean  @default(true)
+  enablePayments       Boolean  @default(true)
+  enableSignups        Boolean  @default(true)
+  enableLogins         Boolean  @default(true)
+  enableCommenting     Boolean  @default(true)
+  enableLikes          Boolean  @default(true)
+  enableFollowing      Boolean  @default(true)
+  enableChats          Boolean  @default(true)
+  enableCalling        Boolean  @default(true)
+  enableDisputes       Boolean  @default(true)
+}
+
+/// Stores information about third-party delivery partners.
+model MarketplacePartner {
+  id      String @id @default(cuid())
+  name    String @unique
+  logoUrl String
+  services Json
+}
