@@ -1,7 +1,7 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut, getCurrentUser } from '../../../../src/services/auth.service';
+import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut, getCurrentUser, getUserProfile } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -275,6 +275,34 @@ export const getCurrentUserController = async (req: AuthenticatedRequest, res: R
         return res.status(200).json({
             status: 'success',
             data: { user },
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+/**
+ * API: Get User Profile
+ * @description Fetches the public profile for a user by ID from the URL path.
+ */
+export const getUserProfileController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        // We ensure the user is logged in via authMiddleware, 
+        // but we use req.params.userId for the profile ID.
+        const userIdToFetch = req.params.userId; 
+
+        if (!userIdToFetch) {
+            // Should be caught by the route definition, but a safeguard.
+             throw new BadRequestError('User ID is missing from the route path.', 400);
+        }
+
+        const userProfile = await getUserProfile(userIdToFetch);
+
+        return res.status(200).json({
+            status: 'success',
+            data: { user: userProfile },
         });
 
     } catch (error) {
