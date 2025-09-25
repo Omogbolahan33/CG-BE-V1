@@ -1,7 +1,7 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut } from '../../../../src/services/auth.service';
+import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut, getCurrentUser } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -248,6 +248,33 @@ export const signOutController = async (req: AuthenticatedRequest, res: Response
             status: 'success',
             message: 'Successfully signed out.',
             success: true
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Get Current User
+ * @description Handles the request to fetch the profile of the logged-in user.
+ */
+export const getCurrentUserController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.userId; 
+
+        if (!userId) {
+            // Should be caught by authMiddleware, but a safeguard.
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+
+        const user = await getCurrentUser(userId);
+
+        return res.status(200).json({
+            status: 'success',
+            data: { user },
         });
 
     } catch (error) {
