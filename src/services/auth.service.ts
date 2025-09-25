@@ -9,31 +9,7 @@ import { sendVerificationEmail } from '../utils/emailSender';
 import { BadRequestError } from '../errors/BadRequestError'; 
 import { NotFoundError } from '../errors/NotFoundError';
 import { ConflictError } from '../errors/ConflictError'; 
-
-// Define the fields we want to exclude from the public User object
-type SensitiveUserFields = 'password'
-  | 'verificationOtp'
-  | 'verificationOtpExpiry'
-  | 'passwordResetOtp'
-  | 'passwordResetOtpExpiry'
-  | 'banReason'
-  | 'banStartDate';
-
-// Define this near the top of your service file or in a shared types file
-type PrivateUserFields = 
-    | 'password' 
-    | 'email' 
-    | 'address' 
-    | 'city' 
-    | 'zipCode' 
-    | 'bankAccount' 
-    | 'verificationOtp' 
-    | 'verificationOtpExpiry' 
-    | 'passwordResetOtp' 
-    | 'passwordResetOtpExpiry';
-
-// The returned public profile will be the base User type without these fields.
-type PublicUserProfile = Omit<User, PrivateUserFields>;
+import type { User, SensitiveUserFields, PrivateUserFields, PublicUserProfile } from '../types';
 
 
 // Define the shape of the login credentials
