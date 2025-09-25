@@ -7,6 +7,6 @@
     "start": "node dist/server.js", // Production: Runs the compiled JS
     "dev": "ts-node-dev --respawn server.ts", // Development: Runs the TS source file in the root
     "build": "tsc",
-    "prisma:generate": "prisma generate",
+    "prisma:generate": "prisma generate"
   }
 }
