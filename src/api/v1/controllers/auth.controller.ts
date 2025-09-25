@@ -1,9 +1,10 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp } from '../../../../src/services/auth.service';
+import { loginUser, logFailedLogin, signUp, verifyEmailByOtp } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
+import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
 
 /**
  * Handles the POST /api/v1/auth/login endpoint.
@@ -97,6 +98,38 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
 
     } catch (error) {
         // Pass error (including AuthenticationError) to the central error handler
+        next(error);
+    }
+};
+
+
+
+/**
+ * Handles the authenticated email verification request.
+ * Requires authMiddleware to run first.
+ */
+export const verifyEmail = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const { otp } = req.body;
+        const userId = req.userId; // Retrieved from the JWT by authMiddleware
+
+        if (!userId) {
+            // This should ideally be caught by authMiddleware, but is a safe check
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+        if (!otp) {
+             throw new AuthenticationError('Verification code is required.', 400);
+        }
+
+        const result = await verifyEmailByOtp({ userId, otp });
+
+        return res.status(200).json({
+            status: 'success',
+            message: 'Email successfully verified.',
+            ...result, // { success: true }
+        });
+
+    } catch (error) {
         next(error);
     }
 };
