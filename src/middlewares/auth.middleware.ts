@@ -11,7 +11,7 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Middleware to verify the JWT and attach user data to the request.
+ * Middleware to verify the JWT and attach user data to the request...
  */
 export const authMiddleware = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
