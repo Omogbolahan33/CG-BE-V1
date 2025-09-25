@@ -1,9 +1,9 @@
 // src/api/v1/controllers/auth.controller.ts
 
-import { Request, Response } from 'express';
-import { loginUser, logFailedLogin } from '../../../../src/services/auth.service';
+import { Request, Response, NextFunction  } from 'express';
+import { loginUser, logFailedLogin, signUp } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
-
+import { AuthenticationError } from '../../../errors/AuthenticationError';
 
 /**
  * Handles the POST /api/v1/auth/login endpoint.
@@ -65,4 +65,38 @@ export const login = async (req: Request, res: Response) => {
         });
     }
   }
+};
+
+
+
+
+/**
+ * Handles the sign-up request.
+ */
+export const signup = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { username, email, password } = req.body;
+
+        if (!username || !email || !password) {
+             throw new AuthenticationError('Missing required credentials.', 400);
+        }
+
+        // Call the service layer with the required data
+        const { user, token } = await signUp({
+            username,
+            email,
+            password,
+        });
+
+        // Success: Return 201 Created
+        return res.status(201).json({
+            status: 'success',
+            message: 'User created successfully. Verification email sent.',
+            data: { user, token },
+        });
+
+    } catch (error) {
+        // Pass error (including AuthenticationError) to the central error handler
+        next(error);
+    }
 };
