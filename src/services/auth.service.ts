@@ -420,3 +420,67 @@ export const verifyEmailByOtp = async (credentials: VerifyEmailByOtpCredentials)
         throw new AuthenticationError('Invalid verification code.', 400);
     }
 };
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+
+/**
+ * API: Resend Verification OTP
+ * @description Generates and sends a new verification OTP to the authenticated user.
+ * @param userId The ID of the logged-in user (from the JWT).
+ */
+export const resendVerificationOtp = async (userId: string): Promise<{ success: boolean }> => {
+    const saltRounds = 10;
+    const OTP_EXPIRY_MINUTES = 15;
+
+    // 1. Find User and Check Pre-conditions
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+    });
+
+    if (!user) {
+        throw new AuthenticationError('Authenticated user not found.', 404);
+    }
+
+    if (user.isVerified) {
+        throw new AuthenticationError('Account is already verified.', 400);
+    }
+    
+    // NOTE: Rate limiting logic (e.g., lastOtpSentAt check) should ideally be performed here 
+    // or by a dedicated middleware/cache to prevent database load.
+
+    // 2. Core Logic: Hashing and OTP Generation
+    const rawOtp = generateOtp(); // Reusing the helper from signUp
+    const hashedOtp = await bcrypt.hash(rawOtp, saltRounds); 
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + OTP_EXPIRY_MINUTES);
+
+    // 3. Update User Record
+    await prisma.$transaction(async (tx) => {
+        // Update the user status with the new OTP details
+        await tx.user.update({
+            where: { id: user.id },
+            data: {
+                verificationOtp: hashedOtp,
+                verificationOtpExpiry: otpExpiry,
+                // Add a field for rate limiting if you have one (e.g., lastOtpSentAt: new Date())
+            }
+        });
+
+        // 4. Side Effect: Send Email
+        await sendVerificationEmail(user.email, rawOtp);
+
+        // 5. Auditing
+        await tx.activityLog.create({
+            data: {
+                userId: user.id,
+                action: 'RESEND_OTP',
+                details: 'New verification OTP generated and sent.',
+            }
+        });
+    });
+    
+    return { success: true };
+};
