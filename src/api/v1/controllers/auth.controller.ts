@@ -155,7 +155,3 @@ export const resendOtp = async (req: AuthenticatedRequest, res: Response, next: 
         next(error);
     }
 };
-    } catch (error) {
-        next(error);
-    }
-};
