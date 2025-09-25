@@ -1,7 +1,7 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut, getCurrentUser, getUserProfile, updateUserSettings } from '../../../../src/services/auth.service';
+import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut, getCurrentUser, getUserProfile, updateUserSettings, updateUserBankAccount } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -336,6 +336,38 @@ export const updateUserSettingsController = async (req: AuthenticatedRequest, re
         return res.status(200).json({
             status: 'success',
             message: 'User settings updated successfully.',
+            data: { user: updatedUser },
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Update User Bank Account
+ * @description Handles the update request for the user's payout bank account.
+ */
+export const updateUserBankAccountController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.userId; 
+        const payload: UpdateBankAccountPayload = req.body;
+
+        if (!userId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+
+        if (!payload.password) {
+            throw new BadRequestError('Current password is required for re-authentication.', 400);
+        }
+        
+        const updatedUser = await updateUserBankAccount(userId, payload);
+        
+        return res.status(200).json({
+            status: 'success',
+            message: 'Bank account updated successfully.',
             data: { user: updatedUser },
         });
 
