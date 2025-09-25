@@ -1,3 +1,4 @@
+
 import { PrismaClient, UserRole, PostCondition, TransactionStatus, DisputeStatus, CategoryType, NotificationType, Prisma } from "@prisma/client";
 import crypto from "crypto";
 
@@ -36,7 +37,7 @@ async function main() {
     verificationOtp?: string;
     passwordResetOtp?: string;
     passwordResetOtpExpiry?: Date;
-    name?: string;
+    name: string;
     avatarUrl?: string;
     address?: string;
     city?: string;
@@ -45,18 +46,30 @@ async function main() {
   };
 
   const usersData: UserData[] = [];
-  for (let i = 1; i <= 4; i++) {
+  // User 1 will be an Admin
+  usersData.push({
+    id: 'user-id-1',
+    username: 'adminuser',
+    email: 'admin@example.com',
+    password: 'hashedpassword1',
+    role: UserRole.Admin,
+    isActive: true,
+    isVerified: true,
+    name: 'Admin User',
+    avatarUrl: `https://i.pravatar.cc/150?img=1`,
+  });
+  for (let i = 2; i <= 4; i++) {
     usersData.push({
       id: `user-id-${i}`,
       username: `user${i}`,
       email: `user${i}@example.com`,
-      password: `hashedpassword${i}`, // In a real app, this should be properly hashed
-      role: i === 1 ? UserRole.Admin : UserRole.Member,
+      password: `hashedpassword${i}`,
+      role: UserRole.Member,
       isActive: true,
       isVerified: i % 2 === 0,
       verificationOtp: generateToken().substring(0, 6),
       passwordResetOtp: generateToken().substring(0, 6),
-      passwordResetOtpExpiry: new Date(Date.now() + 15 * 60 * 1000), // OTPs should have a short expiry
+      passwordResetOtpExpiry: new Date(Date.now() + 15 * 60 * 1000),
       name: `User ${i}`,
       avatarUrl: `https://i.pravatar.cc/150?img=${i}`,
       address: `Street ${i}`,
@@ -69,34 +82,33 @@ async function main() {
   for (const u of usersData) {
     users.push(await prisma.user.create({ data: u }));
   }
-  console.log(`👤 Seeded ${users.length} users.`);
+  const adminUser = users[0];
+  console.log(`👤 Seeded ${users.length} users (1 Admin, 3 Members).`);
   
   // ===== BANK ACCOUNTS =====
   console.log("🌱 Seeding bank accounts...");
-  for (let i = 1; i <= 4; i++) {
+  for (const user of users) {
     await prisma.bankAccount.create({
       data: {
-        userId: users[i-1].id,
-        accountName: `User ${i}`,
-        accountNumber: `012345678${i}`,
+        userId: user.id,
+        accountName: user.name,
+        accountNumber: `012345678${user.id.slice(-1)}`,
         bankName: "Bank Test",
       }
     });
   }
-  console.log(`🏦 Seeded bank accounts.`);
+  console.log(`🏦 Seeded ${users.length} bank accounts.`);
 
 
   // ===== CATEGORIES =====
   console.log("🌱 Seeding categories...");
   type CategoryData = { name: string; description: string; type: CategoryType };
-  const categoriesData: CategoryData[] = [];
-  for (let i = 1; i <= 4; i++) {
-    categoriesData.push({
-      name: `Category ${i}`,
-      description: `Description for category ${i}`,
-      type: i % 2 === 0 ? CategoryType.advert : CategoryType.discussion,
-    });
-  }
+  const categoriesData: CategoryData[] = [
+    { name: 'General Discussion', description: 'Talk about anything.', type: CategoryType.discussion },
+    { name: 'Electronics For Sale', description: 'Buy and sell gadgets.', type: CategoryType.advert },
+    { name: 'Hobbies', description: 'Share your passions.', type: CategoryType.discussion },
+    { name: 'Fashion Market', description: 'Clothing and accessories.', type: CategoryType.advert },
+  ];
 
   const categories = [];
   for (const c of categoriesData) {
@@ -123,24 +135,25 @@ async function main() {
   };
 
   const postsData: PostData[] = [];
-  for (let i = 1; i <= 4; i++) {
-    const isAdvert = i % 2 === 0;
+  for (let i = 0; i < 4; i++) {
+    const category = categories[i];
+    const isAdvert = category.type === 'advert';
     postsData.push({
-      title: `Post Title ${i}`,
-      content: `<p>Content for post ${i}</p>`,
+      title: isAdvert ? `For Sale: Cool Item ${i + 1}` : `Discussion Topic ${i + 1}`,
+      content: `<p>This is the full content for post ${i + 1}.</p>`,
       isAdvert: isAdvert,
-      price: isAdvert ? i * 10 : undefined,
+      price: isAdvert ? (i + 1) * 25.50 : undefined,
       media: {
           type: "image",
-          url: `https://picsum.photos/200/300?random=${i}`
+          url: `https://picsum.photos/400/300?random=${i}`
       },
-      brand: isAdvert ? `Brand ${i}` : undefined,
-      condition: isAdvert ? PostCondition.New : undefined,
-      pinnedAt: i === 4 ? new Date() : undefined,
+      brand: isAdvert ? `Brand ${i + 1}` : undefined,
+      condition: isAdvert ? PostCondition.UsedGood : undefined,
+      pinnedAt: i === 0 ? new Date() : undefined,
       isCommentingRestricted: i === 3,
       isSoldOut: false,
-      authorId: users[i - 1].id,
-      categoryId: categories[i - 1].id,
+      authorId: users[i].id,
+      categoryId: category.id,
       lastActivityTimestamp: new Date(),
     });
   }
@@ -153,42 +166,104 @@ async function main() {
 
   // ===== TRANSACTIONS =====
   console.log("🌱 Seeding transactions...");
-  type TransactionData = {
-    amount: number;
-    status: TransactionStatus;
-    buyerId: string;
-    sellerId: string;
-    postId?: string;
-    trackingNumber?: string;
-    shippingProof?: Prisma.JsonValue;
-    shippedAt?: Date;
-    deliveredAt?: Date;
-  };
+  const advertPosts = posts.filter(p => p.isAdvert);
+  
+  if (advertPosts.length > 0) {
+      type TransactionData = {
+        amount: number;
+        status: TransactionStatus;
+        buyerId: string;
+        sellerId: string;
+        postId?: string;
+        trackingNumber?: string;
+        shippingProof?: Prisma.JsonValue;
+        shippedAt?: Date;
+        deliveredAt?: Date;
+      };
 
-  const transactionsData: TransactionData[] = [];
-  for (let i = 1; i <= 4; i++) {
-    transactionsData.push({
-      amount: i * 20,
-      status: TransactionStatus.Pending,
-      buyerId: users[i - 1].id,
-      sellerId: users[(i % 4)].id, // ensures no self-transaction
-      postId: posts[i - 1].id,
-      trackingNumber: `TRK${i}123`,
-      shippingProof: {
-          name: "shipping-proof.jpg",
-          url: `https://example.com/shipping/${i}`,
-          type: "image"
-      },
-      shippedAt: new Date(),
-      deliveredAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-    });
+      const transactionsData: TransactionData[] = [];
+      for (let i = 0; i < 2; i++) {
+        const post = advertPosts[i];
+        if (!post) continue;
+        const seller = users.find(u => u.id === post.authorId);
+        // Find a buyer who is not the seller
+        const buyer = users.find(u => u.id !== seller?.id);
+        if (!seller || !buyer) continue;
+        
+        transactionsData.push({
+          amount: post.price!,
+          status: TransactionStatus.Pending,
+          buyerId: buyer.id,
+          sellerId: seller.id,
+          postId: post.id,
+          trackingNumber: `TRK${i}123`,
+          shippingProof: {
+              name: "shipping-proof.jpg",
+              url: `https://example.com/shipping/${i}`,
+              type: "image"
+          },
+          shippedAt: new Date(),
+          deliveredAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+        });
+      }
+
+      const transactions = [];
+      for (const t of transactionsData) {
+        transactions.push(await prisma.transaction.create({ data: t as any }));
+      }
+      console.log(`💸 Seeded ${transactions.length} transactions.`);
+      
+      // ===== DISPUTES ===== (only if transactions exist)
+      console.log("🌱 Seeding disputes...");
+      if (transactions.length > 0) {
+        await prisma.dispute.create({
+          data: {
+            reason: `Dispute reason for first transaction`,
+            status: DisputeStatus.Open,
+            transactionId: transactions[0].id,
+            buyerId: transactions[0].buyerId,
+            sellerId: transactions[0].sellerId,
+            resolvedByAdminId: adminUser.id, // Correctly assign admin user
+            chatHistory: [
+              { sender: users.find(u => u.id === transactions[0].buyerId)!.name, message: `This is the initial reason.`, timestamp: new Date().toISOString() }
+            ]
+          }
+        });
+        console.log(`🛡️ Seeded 1 dispute.`);
+      }
+      
+      // ===== ADMIN ACTIONS ===== (only if transactions exist)
+      console.log("🌱 Seeding admin actions...");
+       if (transactions.length > 0) {
+        await prisma.adminAction.create({
+          data: {
+            action: "Forced Payout", // Use a string as per schema
+            details: `Action details for transaction 1`,
+            originalStatus: TransactionStatus.Pending,
+            adminId: adminUser.id, // Correctly assign admin user
+            transactionId: transactions[0].id,
+          }
+        });
+        console.log(`⚙️ Seeded 1 admin action.`);
+      }
+
+       // ===== REVIEWS ===== (only if transactions exist)
+      console.log("🌱 Seeding reviews...");
+      if (transactions.length > 0) {
+        await prisma.review.create({
+          data: {
+            rating: 5,
+            comment: `Great transaction!`,
+            isVerifiedPurchase: true,
+            reviewerId: transactions[0].buyerId,
+            userId: transactions[0].sellerId,
+            transactionId: transactions[0].id,
+          }
+        });
+        console.log(`⭐ Seeded 1 review.`);
+      }
   }
 
-  const transactions = [];
-  for (const t of transactionsData) {
-    transactions.push(await prisma.transaction.create({ data: t as any }));
-  }
-  console.log(`💸 Seeded ${transactions.length} transactions.`);
 
   // ===== COMMENTS =====
   console.log("🌱 Seeding comments...");
@@ -200,13 +275,13 @@ async function main() {
   };
 
   const commentsData: CommentData[] = [];
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 0; i < 4; i++) {
     const hasMedia = i % 2 === 0;
     commentsData.push({
-      content: `Comment ${i} on post`,
-      media: hasMedia ? { type: "image", url: `https://picsum.photos/100/100?random=${i}` } : undefined,
-      authorId: users[i - 1].id,
-      postId: posts[i - 1].id,
+      content: `Comment ${i+1} on post`,
+      media: hasMedia ? { type: "image", url: `https://picsum.photos/100/100?random=${i}` } : Prisma.JsonNull,
+      authorId: users[i].id,
+      postId: posts[i].id,
     });
   }
 
@@ -214,34 +289,6 @@ async function main() {
     await prisma.comment.create({ data: c as any });
   }
   console.log(`💬 Seeded ${commentsData.length} comments.`);
-
-  // ===== REVIEWS =====
-  console.log("🌱 Seeding reviews...");
-  type ReviewData = {
-    rating: number;
-    comment: string;
-    isVerifiedPurchase: boolean;
-    reviewerId: string;
-    userId: string;
-    transactionId?: string;
-  };
-
-  const reviewsData: ReviewData[] = [];
-  for (let i = 1; i <= 4; i++) {
-    reviewsData.push({
-      rating: 4 + (i % 2),
-      comment: `Review ${i}`,
-      isVerifiedPurchase: true,
-      reviewerId: users[i - 1].id,
-      userId: users[(i % 4)].id,
-      transactionId: transactions[i - 1].id,
-    });
-  }
-
-  for (const r of reviewsData) {
-    await prisma.review.create({ data: r });
-  }
-  console.log(`⭐ Seeded ${reviewsData.length} reviews.`);
 
   // ===== NOTIFICATIONS =====
   console.log("🌱 Seeding notifications...");
@@ -252,21 +299,17 @@ async function main() {
     userId: string;
     actorId?: string;
     postId?: string;
-    transactionId?: string;
-    chatId?: string;
-    disputeId?: string;
   };
 
   const notificationsData: NotificationData[] = [];
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i < 4; i++) {
     notificationsData.push({
       type: NotificationType.follow,
-      content: `Notification ${i}`,
-      link: `/posts/${posts[i - 1].id}`,
-      userId: users[i - 1].id,
-      actorId: users[(i % 4)].id,
-      postId: posts[i - 1].id,
-      transactionId: transactions[i - 1].id,
+      content: `User ${users[i].name} started following you.`,
+      link: `/profile/${users[i].id}`,
+      userId: users[0].id, // Notify the admin
+      actorId: users[i].id,
+      postId: posts[i].id,
     });
   }
 
@@ -274,74 +317,16 @@ async function main() {
     await prisma.notification.create({ data: n });
   }
   console.log(`🔔 Seeded ${notificationsData.length} notifications.`);
-
-  // ===== DISPUTES =====
-  console.log("🌱 Seeding disputes...");
-  type DisputeData = {
-    reason: string;
-    status: DisputeStatus;
-    transactionId: string;
-    buyerId: string;
-    sellerId: string;
-    resolvedByAdminId?: string;
-    chatHistory: Prisma.JsonValue;
-  };
-
-  const disputesData: DisputeData[] = [];
-  for (let i = 1; i <= 4; i++) {
-    disputesData.push({
-      reason: `Dispute reason ${i}`,
-      status: DisputeStatus.Open,
-      transactionId: transactions[i - 1].id,
-      buyerId: transactions[i - 1].buyerId,
-      sellerId: transactions[i - 1].sellerId,
-      resolvedByAdminId: users[0].id, // Admin user
-      chatHistory: [
-        { sender: users[i-1].name, message: `This is the initial reason for dispute ${i}.`, timestamp: new Date().toISOString() }
-      ]
-    });
-  }
   
-  for (const d of disputesData) {
-    await prisma.dispute.create({ data: d as any });
-  }
-  console.log(`🛡️ Seeded ${disputesData.length} disputes.`);
-
-  // ===== ADMIN ACTIONS =====
-  console.log("🌱 Seeding admin actions...");
-  type AdminActionData = {
-    action: string;
-    details?: string;
-    originalStatus?: string;
-    adminId: string;
-    transactionId: string;
-  };
-
-  const adminActionsData: AdminActionData[] = [];
-  for (let i = 1; i <= 4; i++) {
-    adminActionsData.push({
-      action: "Forced Payout",
-      details: `Action details ${i}`,
-      originalStatus: TransactionStatus.Pending,
-      adminId: users[0].id, // Admin user
-      transactionId: transactions[i - 1].id,
-    });
-  }
-
-  for (const a of adminActionsData) {
-    await prisma.adminAction.create({ data: a });
-  }
-  console.log(`⚙️ Seeded ${adminActionsData.length} admin actions.`);
-
   // ===== ACTIVITY LOGS =====
   console.log("🌱 Seeding activity logs...");
   type ActivityLogData = { action: string; details: string; userId: string };
   const activityLogsData: ActivityLogData[] = [];
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 0; i < 4; i++) {
     activityLogsData.push({
-      action: `Action ${i}`,
-      details: `Details for action ${i}`,
-      userId: users[i - 1].id,
+      action: `Created Post`,
+      details: `User created post "${posts[i].title}"`,
+      userId: users[i].id,
     });
   }
 
@@ -357,9 +342,6 @@ main()
   .catch((e) => {
     console.error("An error occurred during seeding:");
     console.error(e);
-    // FIX: Cast `process` to `any` to resolve a TypeScript error where 'exit' was not
-    // found on the Process type. This is a common issue in environments where Node.js
-    // globals are not fully typed, and this script is intended to run in Node.
     (process as any).exit(1);
   })
   .finally(async () => {
