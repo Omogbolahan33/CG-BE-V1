@@ -10,6 +10,7 @@ import { BadRequestError } from '../errors/BadRequestError';
 import { NotFoundError } from '../errors/NotFoundError';
 import { ConflictError } from '../errors/ConflictError'; 
 import { ForbiddenError } from '../errors/ForbiddenError'; 
+import { emitWebSocketEvent } from '../utils/ws.util'; 
 import type {  User, SensitiveUserFields, PrivateUserFields, PublicUserProfile, NotificationType } from '../types';
 
 
