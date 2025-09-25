@@ -23,7 +23,8 @@ export const login = async (req: Request, res: Response) => {
     res.cookie('token', token, {
       maxAge: maxAge, // Max-Age=86400
       httpOnly: true, // HttpOnly
-      secure: process.env.NODE_ENV === 'production', // Secure (MUST be true in production)
+      // Check the environment: Secure MUST be true in production (HTTPS), false in development (HTTP)
+      secure: process.env.NODE_ENV === 'production', // <-- CRITICAL FIX HERE
       sameSite: 'strict', // SameSite=Strict
       path: '/', // Path=/
     });
