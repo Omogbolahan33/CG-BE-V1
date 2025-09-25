@@ -43,10 +43,16 @@ interface SignUpResponse {
 }
 // Define the shape of the verifyEmail credentials
 interface VerifyEmailByOtpCredentials {
-  userId: string; // Passed from authMiddleware
+  userId: string;
   otp: string;
 }
 
+// Define the shape of the ResetPassword credentials
+interface ResetPasswordCredentials {
+  email: string;
+  otp: string;
+  newPassword: string;
+}
 
 // --- Internal Helpers ---
 
@@ -486,6 +492,8 @@ export const resendVerificationOtp = async (userId: string): Promise<{ success: 
 };
 
 
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
 
 /**
  * API: Request Password Reset
@@ -552,4 +560,87 @@ export const requestPasswordReset = async (email: string): Promise<{ success: bo
 export const sendPasswordResetEmail = async (email: string, otp: string): Promise<void> => {
     console.log(`EMAIL STUB: Sent password reset code ${otp} to ${email}`);
     return Promise.resolve();
+};
+
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+
+/**
+ * API: Reset Password
+ * @description Sets a new password for the user after verifying the OTP.
+ * @param data Email, OTP, and the new password.
+ * @returns { success: true } if the password was successfully reset.
+ */
+export const resetPassword = async (data: ResetPasswordCredentials): Promise<{ success: boolean }> => {
+    const { email, otp, newPassword } = data;
+    const saltRounds = 10;
+    const cleanedEmail = cleanIdentifier(email).toLowerCase();
+
+    // 1. Validation: New Password Strength
+    if (newPassword.length < 6) {
+        throw new AuthenticationError('New password must be at least 6 characters long.', 400);
+    }
+    
+    // 2. Find User by Email
+    const user = await prisma.user.findFirst({
+        where: { email: cleanedEmail },
+    });
+
+    if (!user) {
+        // Return a generic error to avoid confirming non-existent emails, 
+        // though the error code is 400 as per specification for "invalid credentials"
+        throw new AuthenticationError('Invalid email, OTP, or weak password.', 400);
+    }
+
+    // 3. Pre-conditions & Expiry Check
+    if (!user.passwordResetOtp || !user.passwordResetOtpExpiry) {
+        throw new AuthenticationError('Invalid email, OTP, or weak password.', 400);
+    }
+    
+    if (user.passwordResetOtpExpiry < new Date()) {
+        // Clear expired OTP fields (fire-and-forget, safety cleanup)
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { passwordResetOtp: null, passwordResetOtpExpiry: null },
+        });
+        throw new AuthenticationError('Password reset code has expired.', 400);
+    }
+
+    // 4. OTP Comparison
+    const isOtpValid = await bcrypt.compare(otp, user.passwordResetOtp);
+
+    if (!isOtpValid) {
+        throw new AuthenticationError('Invalid password reset code.', 400);
+    }
+
+    // 5. Core Logic: Hash New Password
+    const newHashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // 6. Atomic Update Transaction
+    await prisma.$transaction(async (tx) => {
+        // a. Update the user's password
+        await tx.user.update({
+            where: { id: user.id },
+            data: {
+                password: newHashedPassword,
+                // b. Atomically clear the OTP fields
+                passwordResetOtp: null, 
+                passwordResetOtpExpiry: null,
+            }
+        });
+
+        // c. Auditing
+        await tx.activityLog.create({
+            data: {
+                userId: user.id,
+                action: 'PASSWORD_RESET_SUCCESS',
+                details: 'Password successfully reset via OTP flow.',
+            }
+        });
+    });
+
+    return { success: true };
 };
