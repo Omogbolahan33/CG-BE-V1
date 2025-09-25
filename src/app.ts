@@ -17,8 +17,9 @@ const app: Application = express();
 // Set this to the exact domain where your frontend app is hosted (e.g., 'https://your-frontend-app.com')
 // Use a list if you have multiple domains (e.g., development and production)
 const allowedOrigins = [
-    'http://localhost:3000', // For local development
-    'https://aistudio.google.com' // CHANGE THIS to your actual frontend domain
+    'http://localhost:3000', 
+    'https://aistudio.google.com', 
+    'https://0z57rgyh0m3r4xfj7sl00eygmiymd0unimkffhkn6zzq1twd26-h807678934.scf.usercontent.goog'
 ];
 
 const corsOptions: cors.CorsOptions = {
