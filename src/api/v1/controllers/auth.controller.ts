@@ -129,6 +129,10 @@ export const verifyEmail = async (req: AuthenticatedRequest, res: Response, next
             ...result, // { success: true }
         });
     }
+
+      catch (error) {
+        next(error);
+    }
 };
       /**
  * Handles the authenticated request to resend the verification OTP.
