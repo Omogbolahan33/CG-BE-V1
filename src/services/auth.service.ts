@@ -41,6 +41,13 @@ interface SignUpResponse {
     user: Omit<User, SensitiveUserFields>; 
     token: string;
 }
+// Define the shape of the verifyEmail credentials
+interface VerifyEmailByOtpCredentials {
+  userId: string; // Passed from authMiddleware
+  otp: string;
+}
+
+
 // --- Internal Helpers ---
 
 /**
@@ -342,4 +349,74 @@ export const signUp = async (credentials: SignUpCredentials): Promise<SignUpResp
         user: userWithoutSensitiveFields,
         token: token,
     };
+};
+
+
+// --- Main Service Logic ------------------------------------------------------------------
+
+/**
+ * API: Verify Email (Authenticated)
+ * @description Verifies a user's email address using a time-sensitive OTP,
+ * retrieving user data from the provided userId (via JWT).
+ * @param credentials User ID and the 6-digit OTP.
+ */
+export const verifyEmailByOtp = async (credentials: VerifyEmailByOtpCredentials): Promise<{ success: boolean }> => {
+    const { userId, otp } = credentials;
+
+    // 1. Find User by ID
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+    });
+
+    // Should not happen if authMiddleware is correctly implemented, but good for defense
+    if (!user) {
+        throw new AuthenticationError('Authenticated user not found.', 404);
+    }
+
+    // 2. Pre-conditions Check
+    if (user.isVerified) {
+        throw new AuthenticationError('Account is already verified.', 400);
+    }
+    if (!user.verificationOtp || !user.verificationOtpExpiry) {
+        throw new AuthenticationError('No pending verification found. Request a new code.', 400);
+    }
+
+    // 3. OTP Expiry Check
+    if (user.verificationOtpExpiry < new Date()) {
+        // The error response is sent, but the cleanup is handled by the atomic update below
+        throw new AuthenticationError('Verification code has expired. Please request a new one.', 400);
+    }
+
+    // 4. OTP Comparison
+    const isOtpValid = await bcrypt.compare(otp, user.verificationOtp);
+    
+    // 5. Atomic Update Transaction
+    if (isOtpValid) {
+        await prisma.$transaction(async (tx) => {
+            // Update the user status and clear OTP fields
+            await tx.user.update({
+                where: { id: user.id },
+                data: {
+                    isVerified: true,
+                    verificationOtp: null, 
+                    verificationOtpExpiry: null,
+                }
+            });
+
+            // Log activity
+            await tx.activityLog.create({
+                data: {
+                    userId: user.id,
+                    action: 'EMAIL_VERIFIED',
+                    details: 'User successfully verified email via OTP.',
+                }
+            });
+        });
+        
+        return { success: true };
+
+    } else {
+        // Invalid OTP provided
+        throw new AuthenticationError('Invalid verification code.', 400);
+    }
 };
