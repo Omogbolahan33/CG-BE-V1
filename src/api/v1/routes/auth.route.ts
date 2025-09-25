@@ -1,7 +1,7 @@
 // src/api/v1/routes/auth.route.ts
 
 import { Router } from 'express';
-import { login, signup, verifyEmail, resendOtp } from '../controllers/auth.controller';
+import { login, signup, verifyEmail, resendOtp, requestReset } from '../controllers/auth.controller';
 import { loginRateLimiter } from '../../../middlewares/rateLimiter';
 import { authMiddleware } from '../../../middlewares/auth.middleware';
 
@@ -21,5 +21,7 @@ router.post('/verify-email', authMiddleware, verifyEmail);
 // Route for resending verification OTP
 router.post('/resend-verification-otp', authMiddleware, resendOtp);
 
+// Route for requesting password reset
+router.post('/request-password-reset', requestReset);
 
 export default router;
