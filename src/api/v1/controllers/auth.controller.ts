@@ -1,7 +1,7 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp  } from '../../../../src/services/auth.service';
+import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -156,6 +156,36 @@ export const resendOtp = async (req: AuthenticatedRequest, res: Response, next: 
         });
 
     } catch (error) {
+        next(error);
+    }
+};
+
+
+
+
+/**
+ * Handles the request to initiate the password reset process.
+ */
+export const requestReset = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+             throw new AuthenticationError('Email address is required to request a password reset.', 400);
+        }
+
+        // Call the service, which handles user lookup and security checks internally.
+        const result = await requestPasswordReset(email);
+
+        // ALWAYS return 200 OK to prevent enumeration attacks.
+        return res.status(200).json({
+            status: 'success',
+            message: 'If an account with that email exists, a password reset code has been sent.',
+            ...result, // { success: true }
+        });
+
+    } catch (error) {
+        // Only internal errors (like DB failure) should reach here, not business logic errors.
         next(error);
     }
 };
