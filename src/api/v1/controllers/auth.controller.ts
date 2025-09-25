@@ -1,7 +1,7 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut, getCurrentUser, getUserProfile, updateUserSettings, updateUserBankAccount } from '../../../../src/services/auth.service';
+import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut, getCurrentUser, getUserProfile, updateUserSettings, updateUserBankAccount, requestFollow } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -373,6 +373,34 @@ export const updateUserBankAccountController = async (req: AuthenticatedRequest,
             status: 'success',
             message: 'Bank account updated successfully.',
             data: { user: updatedUser },
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Request Follow
+ * @description Handles the request to send a follow request to another user.
+ */
+export const requestFollowController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const currentUserId = req.userId; // The follower
+        const targetUserId = req.params.userId; // The user being followed
+
+        if (!currentUserId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+
+        const result = await requestFollow(currentUserId, targetUserId);
+        
+        return res.status(200).json({
+            status: 'success',
+            message: 'Follow request sent.',
+            ...result,
         });
 
     } catch (error) {
