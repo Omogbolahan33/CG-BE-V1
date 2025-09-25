@@ -16,6 +16,23 @@ type SensitiveUserFields = 'password'
   | 'banReason'
   | 'banStartDate';
 
+// Define this near the top of your service file or in a shared types file
+type PrivateUserFields = 
+    | 'password' 
+    | 'email' 
+    | 'address' 
+    | 'city' 
+    | 'zipCode' 
+    | 'bankAccount' 
+    | 'verificationOtp' 
+    | 'verificationOtpExpiry' 
+    | 'passwordResetOtp' 
+    | 'passwordResetOtpExpiry';
+
+// The returned public profile will be the base User type without these fields.
+type PublicUserProfile = Omit<User, PrivateUserFields>;
+
+
 // Define the shape of the login credentials
 interface LoginCredentials {
   identifier: string;
@@ -734,4 +751,53 @@ export const getCurrentUser = async (userId: string): Promise<Omit<User, Sensiti
     } = user;
 
     return userWithoutSensitiveFields;
+};
+
+
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+/**
+ * API: Get User Profile
+ * @description Fetches the public profile data for any user by ID.
+ * @param userId The ID of the user whose profile is requested.
+ * @returns The public-safe user profile object.
+ */
+export const getUserProfile = async (userId: string): Promise<PublicUserProfile> => {
+
+    // 1. Find User by ID
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        // IMPORTANT: Use select to only query fields you might need for the Public Profile.
+        // This is more efficient and safer than querying all fields.
+        // We'll query all fields for now to simplify, but a real app should use 'select'.
+    });
+
+    if (!user) {
+        throw new NotFoundError(`User with ID ${userId} not found.`, 404);
+    }
+
+    // 2. Data Exclusion: Explicitly exclude sensitive fields before returning
+    const {
+        password: _, 
+        email: __, 
+        address: ___, 
+        city: ____, 
+        zipCode: _____, 
+        bankAccount: ______, // BankAccount is a relation, so it will be undefined or null here if not explicitly included in the query.
+        verificationOtp: _______, 
+        verificationOtpExpiry: ________, 
+        passwordResetOtp: _________, 
+        passwordResetOtpExpiry: __________,
+        ...publicProfile
+    } = user;
+    
+    // Note: The 'bankAccount' field is a relation (BankAccounts is another model). 
+    // If you don't use `include: { bankAccount: true }` in the query, it will be excluded 
+    // automatically by Prisma, but it must be included in the destructuring list for type safety 
+    // if you use `Omit` in your type definition.
+
+    return publicProfile as PublicUserProfile;
 };
