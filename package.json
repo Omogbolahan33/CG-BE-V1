@@ -1,0 +1,13 @@
+{
+  "name": "social-marketplace-api",
+  "version": "1.0.0",
+  "description": "API for Social Marketplace",
+  "main": "dist/server.js", // The compiled output will be here
+  "scripts": {
+    "start": "node dist/server.js", // Production: Runs the compiled JS
+    "dev": "ts-node-dev --respawn server.ts", // Development: Runs the TS source file in the root
+    "build": "tsc",
+    "prisma:generate": "prisma generate"
+  },
+  // ... rest of the file
+}
