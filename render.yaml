@@ -20,5 +20,5 @@ services:
         value: 10000 # Render assigns this port; Express should use process.env.PORT
       - key: DATABASE_URL # Must be linked to your Render PostgreSQL database
         sync: false
-      - key: JWT_PRIVATE_KEY # RS256 private key for JWT signing (Placeholder)
+      - key: JWT_SECRET # RS256 private key for JWT signing (Placeholder)
         sync: false
