@@ -1,7 +1,7 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp, verifyEmailByOtp } from '../../../../src/services/auth.service';
+import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp  } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -129,6 +129,32 @@ export const verifyEmail = async (req: AuthenticatedRequest, res: Response, next
             ...result, // { success: true }
         });
 
+
+      /**
+ * Handles the authenticated request to resend the verification OTP.
+ * Requires authMiddleware to run first.
+ */
+export const resendOtp = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.userId; // Retrieved from the JWT by authMiddleware
+
+        if (!userId) {
+            // Should be caught by middleware, but a safeguard.
+            throw new AuthenticationError('Authentication token missing or invalid.', 401);
+        }
+
+        const result = await resendVerificationOtp(userId);
+
+        return res.status(200).json({
+            status: 'success',
+            message: 'A new verification code has been sent to your email.',
+            ...result, // { success: true }
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
     } catch (error) {
         next(error);
     }
