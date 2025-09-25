@@ -128,8 +128,8 @@ export const verifyEmail = async (req: AuthenticatedRequest, res: Response, next
             message: 'Email successfully verified.',
             ...result, // { success: true }
         });
-
-
+    }
+};
       /**
  * Handles the authenticated request to resend the verification OTP.
  * Requires authMiddleware to run first.
