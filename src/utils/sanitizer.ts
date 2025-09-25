@@ -3,9 +3,13 @@
 import { JSDOM } from 'jsdom';
 import DOMPurify from 'dompurify';
 
-// Initialize DOMPurify for server-side use
-const window = new JSDOM('').window as unknown as Window;
-const purify = DOMPurify(window);
+// 1. Initialize JSDOM and capture the window object.
+const { window } = new JSDOM('');
+
+// 2. Initialize DOMPurify for server-side use.
+// We cast the window object to 'any' to bypass the strict type mismatch 
+// between jsdom's Window and DOMPurify's required WindowLike type.
+const purify = DOMPurify(window as any); // <-- **FIX IS HERE**
 
 /**
  * Sanitizes a string to prevent XSS attacks.
@@ -14,8 +18,6 @@ const purify = DOMPurify(window);
  */
 export const sanitize = (dirty: string): string => {
   // Use a strict configuration, allowing no HTML elements
-  // For posts/comments, you might allow a few like <b>, <i>, <a>, but for security, 
-  // we start with the strictest possible setting.
   const clean = purify.sanitize(dirty, {ALLOWED_TAGS: [], ALLOWED_ATTR: []});
   return clean;
 };
