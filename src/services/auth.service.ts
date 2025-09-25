@@ -6,6 +6,9 @@ import { cleanIdentifier } from '../utils/sanitizer';
 import { User, UserRole, BackofficeSettings } from '@prisma/client';
 import { AuthenticationError } from '../errors/AuthenticationError'; 
 import { sendVerificationEmail } from '../utils/emailSender';
+import { BadRequestError } from '../../../errors/BadRequestError'; 
+import { NotFoundError } from '../errors/NotFoundError';
+
 
 // Define the fields we want to exclude from the public User object
 type SensitiveUserFields = 'password'
