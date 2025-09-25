@@ -5,6 +5,7 @@ import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerification
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
+import { BadRequestError } from '../../../errors/BadRequestError';
 
 /**
  * Handles the POST /api/v1/auth/login endpoint.
