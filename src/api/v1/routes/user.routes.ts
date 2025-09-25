@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../../middlewares/auth.middleware';
 // Import the new controller function
-import { getCurrentUserController, getUserProfileController } from '../controllers/auth.controller'; 
+import { getCurrentUserController, getUserProfileController, updateUserSettingsController } from '../controllers/auth.controller'; 
 
 const router = Router();
 
@@ -12,5 +12,8 @@ router.get('/me', authMiddleware, getCurrentUserController);
 // Endpoint: GET /api/v1/users/{userId}
 router.get('/:userId', authMiddleware, getUserProfileController); 
 
+// Route for getting any user's public profile by ID
+// Endpoint: GET /api/v1/users/{userId}
+router.get('/:userId', authMiddleware, getUserProfileController); 
 
 export default router;
