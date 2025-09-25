@@ -6,6 +6,16 @@ import jwt from 'jsonwebtoken';
 import { cleanIdentifier } from '../utils/sanitizer';
 import { User, UserRole, BackofficeSettings } from '@prisma/client';
 
+// Define the fields we want to exclude from the public User object
+type SensitiveUserFields = 'password' 
+  | 'verificationOtp' 
+  | 'verificationOtpExpiry' 
+  | 'passwordResetOtp' 
+  | 'passwordResetOtpExpiry' 
+  | 'banReason' // Might be sensitive administrative detail
+  | 'banStartDate';
+
+
 // Define the shape of the login credentials
 interface LoginCredentials {
   identifier: string;
@@ -14,7 +24,7 @@ interface LoginCredentials {
 
 // Define the expected successful response type
 interface LoginResponse {
-  user: Omit<User, 'password'>; // Exclude password from the returned User object
+  user: Omit<User, SensitiveUserFields>; // Exclude password from the returned User object
   token: string;
 }
 
@@ -134,13 +144,23 @@ export const loginUser = async (credentials: LoginCredentials): Promise<LoginRes
     expiresIn: '24h', // 86400 seconds
   });
 
-  // Prepare user object for response (excluding sensitive fields)
-  const { password: _, verificationOtp: __, verificationOtpExpiry: ___, passwordResetOtp: ____, passwordResetOtpExpiry: _____, ...userWithoutPassword } = loggedInUser;
-  
-  return {
-    user: userWithoutPassword,
-    token: token,
-  };
+// Prepare user object for response (excluding sensitive fields)
+const { 
+  password: _, 
+  verificationOtp: __, 
+  verificationOtpExpiry: ___, 
+  passwordResetOtp: ____, 
+  passwordResetOtpExpiry: _____, 
+  banReason: ______, 
+  banStartDate: _______, 
+  ...userWithoutPassword 
+} = loggedInUser; // Destructure and omit all sensitive fields
+
+// The userWithoutPassword object is now correctly typed as Omit<User, SensitiveUserFields>
+return {
+  user: userWithoutPassword,
+  token: token,
+};
 };
 
 /**
