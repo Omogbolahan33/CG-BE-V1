@@ -644,3 +644,60 @@ export const resetPassword = async (data: ResetPasswordCredentials): Promise<{ s
 
     return { success: true };
 };
+
+
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+/**
+ * STUB: Simulates adding a JWT identifier (jti) to a server-side blocklist (e.g., Redis).
+ * @param jti The JWT ID to block.
+ * @param tokenExpirySeconds The time until the token would naturally expire.
+ */
+const blockJwt = async (jti: string, tokenExpirySeconds: number): Promise<void> => {
+    // In a real application, this would be:
+    // await redisClient.set(`blocked:${jti}`, '1', 'EX', tokenExpirySeconds);
+    console.log(`SECURITY: JWT ID ${jti} blocked for ${tokenExpirySeconds} seconds.`);
+    return Promise.resolve();
+};
+
+/**
+ * API: Sign Out
+ * @description Implements server-side logout by invalidating the current JWT.
+ * @param token The raw JWT string from the request.
+ * @param userId The ID of the logged-in user.
+ */
+export const signOut = async (token: string, userId: string): Promise<{ success: boolean }> => {
+    // 1. Decode the JWT to get the JTI and Expiry
+    const decodedToken = jwt.decode(token, { complete: true }) as { header: any, payload: jwt.JwtPayload };
+    const jti = decodedToken.payload.jti;
+    const exp = decodedToken.payload.exp;
+
+    if (!jti || !exp) {
+        // If JTI or EXP are missing (which shouldn't happen if token generation is correct)
+        throw new AuthenticationError('Invalid token structure for logout.', 400);
+    }
+    
+    // 2. Calculate remaining time for blocklist TTL (Time-To-Live)
+    const nowInSeconds = Math.floor(Date.now() / 1000);
+    const timeRemaining = exp - nowInSeconds;
+    
+    if (timeRemaining > 0) {
+        // 3. Block the JWT identifier (Server-side Invalidaton)
+        await blockJwt(jti, timeRemaining);
+    }
+
+    // 4. Auditing
+    await prisma.activityLog.create({
+        data: {
+            userId: userId,
+            action: 'USER_SIGNOUT',
+            details: `User successfully signed out. JWT ID ${jti} blocked for ${timeRemaining} seconds.`,
+        }
+    });
+
+    // Success response
+    return { success: true };
+};
