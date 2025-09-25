@@ -1,7 +1,7 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword } from '../../../../src/services/auth.service';
+import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -214,6 +214,43 @@ export const resetPasswordController = async (req: Request, res: Response, next:
 
     } catch (error) {
         // Catches AuthenticationError for invalid OTP/email/weak password
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Sign Out
+ * @description Logs out the user by clearing the session cookie and blocklisting the JWT.
+ */
+export const signOutController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.userId;
+        const token = req.token;
+
+        if (!userId || !token) {
+            throw new AuthenticationError('Authentication token missing or invalid.', 401);
+        }
+
+        // 1. Server-side Blocklisting
+        await signOut(token, userId);
+
+        // 2. Client-side Invalidation: Clear the HttpOnly cookie
+        res.clearCookie('jwt', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict', // Use the same options used when setting the cookie
+        });
+
+        // 3. Success Response
+        return res.status(200).json({
+            status: 'success',
+            message: 'Successfully signed out.',
+            success: true
+        });
+
+    } catch (error) {
         next(error);
     }
 };
