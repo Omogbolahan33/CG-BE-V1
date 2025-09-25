@@ -2,7 +2,7 @@
 
 // --- Best Practice: Import types directly from the Prisma Client ---
 // Assuming your Prisma model is named 'User' and 'BankAccounts'
-import { User as PrismaUser, BankAccounts as PrismaBankAccount  } from '@prisma/client';
+import { User as PrismaUser, BankAccount as PrismaBankAccount  } from '@prisma/client';
 
 // Re-export the core types for use across the application
 export type User = PrismaUser;
