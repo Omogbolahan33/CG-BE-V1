@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { cleanIdentifier } from '../utils/sanitizer';
 import { User, UserRole, BackofficeSettings } from '@prisma/client';
-import { AuthenticationError } from '../../errors/AuthenticationError'; // Assuming you have a custom error class for clarity
+import { AuthenticationError } from '../errors/AuthenticationError'; // Assuming you have a custom error class for clarity
 
 // Define the fields we want to exclude from the public User object
 type SensitiveUserFields = 'password'
