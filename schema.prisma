@@ -85,7 +85,7 @@ model User {
   password                  String
   email                     String       @unique
   role                      UserRole     @default(Member)
-  name                      String
+  name                      String?
   avatarUrl                 String?
   address                   String?
   city                      String?
