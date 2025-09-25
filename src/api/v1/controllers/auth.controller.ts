@@ -1,7 +1,7 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut, getCurrentUser, getUserProfile } from '../../../../src/services/auth.service';
+import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut, getCurrentUser, getUserProfile, updateUserSettings } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -304,6 +304,39 @@ export const getUserProfileController = async (req: AuthenticatedRequest, res: R
         return res.status(200).json({
             status: 'success',
             data: { user: userProfile },
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+
+/**
+ * API: Update User Settings (PUT /users/me)
+ * @description Handles the update request for the authenticated user's profile.
+ */
+export const updateUserSettingsController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.userId; 
+        const settingsData: Partial<User> = req.body;
+
+        if (!userId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+        
+        // The service handles all complex business logic, validation, and side effects
+        const updatedUser = await updateUserSettings(userId, settingsData);
+        
+        // NOTE on Realtime: This is where you would emit the WebSocket event:
+        // io.emit(`userUpdate:${userId}`, updatedUser); 
+        
+        return res.status(200).json({
+            status: 'success',
+            message: 'User settings updated successfully.',
+            data: { user: updatedUser },
         });
 
     } catch (error) {
