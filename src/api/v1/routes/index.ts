@@ -1,7 +1,7 @@
 // src/api/v1/routes/index.ts (Updated)
 
 import { Router } from 'express';
-import userRoutes from './user.route';
+// import userRoutes from './user.route';
 import authRoutes from './auth.route'; // <--- NEW IMPORT
 
 const v1Router = Router();
