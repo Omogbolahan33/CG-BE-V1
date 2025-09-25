@@ -1,0 +1,24 @@
+# render.yaml
+
+services:
+  - type: web
+    name: social-marketplace-api
+    env: node
+    plan: starter # Or 'pro' for a higher-capacity service
+    rootDir: ./
+    buildCommand: |
+      npm install
+      npm run build
+      npx prisma generate # Ensure Prisma client is generated for production
+    startCommand: node dist/server.js
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000 # Render assigns this port; Express should use process.env.PORT
+      - key: DATABASE_URL # Must be linked to your Render PostgreSQL database
+        sync: false
+      - key: JWT_PRIVATE_KEY # RS256 private key for JWT signing (Placeholder)
+        sync: false
