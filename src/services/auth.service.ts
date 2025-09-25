@@ -9,7 +9,7 @@ import { sendVerificationEmail } from '../utils/emailSender';
 import { BadRequestError } from '../errors/BadRequestError'; 
 import { NotFoundError } from '../errors/NotFoundError';
 import { ConflictError } from '../errors/ConflictError'; 
-import type { User, SensitiveUserFields, PrivateUserFields, PublicUserProfile } from '../types';
+import type { SensitiveUserFields, PrivateUserFields, PublicUserProfile } from '../types';
 
 
 // Define the shape of the login credentials
