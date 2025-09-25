@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { cleanIdentifier } from '../utils/sanitizer';
 import { User, UserRole, BackofficeSettings } from '@prisma/client';
-import { AuthenticationError } from '../errors/AuthenticationError'; // Assuming you have a custom error class for clarity
+import { AuthenticationError } from '../../errors/AuthenticationError'; // Assuming you have a custom error class for clarity
 
 // Define the fields we want to exclude from the public User object
 type SensitiveUserFields = 'password'
@@ -139,13 +139,13 @@ export const loginUser = async (credentials: LoginCredentials): Promise<LoginRes
 
     // --- 3. Check Account Status (isActive) ---
     if (!user.isActive) {
-        throw Object.assign(new Error('Account is deactivated. Please contact support.'), { statusCode: 403 });
+        throw new AuthenticationError('Account is deactivated. Please contact support.', 403); // Uses 403
     }
 
     // --- 4. Check Ban Status (banExpiresAt) ---
     const isBanned = user.banExpiresAt && user.banExpiresAt > new Date();
     if (isBanned) {
-        throw Object.assign(new Error(`Account is banned until ${user.banExpiresAt!.toISOString()}.`), { statusCode: 403 });
+         throw new AuthenticationError(`Account is banned until ${user.banExpiresAt!.toISOString()}.`, 403); // Uses 403
     }
 
     // --- Side Effect: Update lastSeen (Transactional Integrity) ---
