@@ -7,6 +7,7 @@ import { AuthenticationError } from '../errors/AuthenticationError';
 export interface AuthenticatedRequest extends Request {
     userId?: string;
     role?: string;
+    token?: string;
 }
 
 /**
@@ -18,25 +19,30 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
         if (!secret) {
             throw new Error('JWT_SECRET is not configured.');
         }
-
+            let token: string | undefined; // Use a local variable to hold the token
+        
         // 1. Get token from Authorization header (Bearer <token>)
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             // Check for cookie as fallback (if set during login)
-            const token = req.cookies?.jwt;
-            if (!token) {
-                 throw new AuthenticationError('Authentication token missing.', 401);
-            }
-            req.token = token;
+            token = req.cookies?.jwt;
         } else {
-            req.token = authHeader.split(' ')[1];
+            token = authHeader.split(' ')[1];
+        }
+        
+        // 2. Handle missing token
+        if (!token) {
+             throw new AuthenticationError('Authentication token missing.', 401);
         }
 
-        // 2. Verify and decode the JWT
-        const decoded = jwt.verify(req.token, secret, { algorithms: ['HS256'] }) as JwtPayload;
+        // We can still assign it to the request object for logging/debugging if needed:
+        req.token = token; 
+
+        // 3. Verify and decode the JWT
+        const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as JwtPayload;
         const userId = decoded.userId as string;
 
-        // 3. Check if user exists and is active (Optional, but good security)
+        // 4. Check if user exists and is active (Optional, but good security)
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: { id: true, role: true, isActive: true }
@@ -46,14 +52,14 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
             throw new AuthenticationError('User session invalid or account inactive.', 401);
         }
 
-        // 4. Attach user data to the request object
+        // 5. Attach user data to the request object
         req.userId = user.id;
         req.role = user.role;
         
         next();
 
     } catch (error) {
-        // Handle JWT verification errors (e.g., expired, invalid signature)
+        // ... rest of the error handling ...
         if (error instanceof jwt.JsonWebTokenError) {
              return next(new AuthenticationError('Invalid token or expired session.', 401));
         }
