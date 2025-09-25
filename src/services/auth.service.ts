@@ -1,9 +1,11 @@
 import prisma from '../utils/prisma';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import * as crypto from 'crypto';
 import { cleanIdentifier } from '../utils/sanitizer';
 import { User, UserRole, BackofficeSettings } from '@prisma/client';
-import { AuthenticationError } from '../errors/AuthenticationError'; // Assuming you have a custom error class for clarity
+import { AuthenticationError } from '../errors/AuthenticationError'; 
+import { sendVerificationEmail } from '../utils/emailSender';
 
 // Define the fields we want to exclude from the public User object
 type SensitiveUserFields = 'password'
@@ -22,13 +24,23 @@ interface LoginCredentials {
   ip?: string;
   userAgent?: string;
 }
-
 // Define the expected successful response type
 interface LoginResponse {
   user: Omit<User, SensitiveUserFields>;
   token: string;
 }
 
+// Define the shape of the signup credentials
+interface SignUpCredentials {
+  username: string;
+  email: string;
+  password: string;
+}
+// Define the expected successful response type
+interface SignUpResponse {
+    user: Omit<User, SensitiveUserFields>; 
+    token: string;
+}
 // --- Internal Helpers ---
 
 /**
@@ -75,8 +87,23 @@ export const logFailedLogin = async (identifier: string, ip: string | undefined,
     });
 };
 
+/**
+ * Generates a 6-digit numeric OTP.
+ */
+const generateOtp = (): string => {
+    return crypto.randomInt(100000, 1000000).toString();
+};
 
-// --- Main Service Logic ---
+/**
+ * Validates the username format based on the business logic: 
+ * alphanumeric, 6-11 characters.
+ */
+const validateUsername = (username: string): boolean => {
+    return /^[a-zA-Z0-9]{6,11}$/.test(username);
+};
+
+
+// --- Main Service Logic ----------------------------------------------
 
 /**
  * Primary business logic for user login.
@@ -202,6 +229,117 @@ export const loginUser = async (credentials: LoginCredentials): Promise<LoginRes
 
     return {
         user: userWithoutPassword,
+        token: token,
+    };
+};
+
+
+
+// --- Main Service Logic ------------------------------------------------------------------
+
+/**
+ * API: Sign Up
+ * @description Registers a new user with email verification flow.
+ * @param credentials User registration details.
+ * @returns The newly created user object (without password) and a JWT token.
+ */
+export const signUp = async (credentials: SignUpCredentials): Promise<SignUpResponse> => {
+    const { username, email, password } = credentials;
+    const saltRounds = 10;
+    const OTP_EXPIRY_MINUTES = 15;
+
+    // 1. Validation and Sanitization
+    if (!username || !email || !password) {
+        throw new AuthenticationError('All fields are required.', 400);
+    }
+    
+    const cleanedUsername = cleanIdentifier(username).toLowerCase();
+    const cleanedEmail = cleanIdentifier(email).toLowerCase();
+
+    if (!validateUsername(cleanedUsername)) {
+        throw new AuthenticationError('Username must be 6-11 alphanumeric characters.', 400);
+    }
+    if (password.length < 6) {
+        throw new AuthenticationError('Password must be at least 6 characters long.', 400);
+    }
+    
+    // 2. Pre-conditions (Backoffice Settings Check)
+    const settings = await getBackofficeSettings();
+    if (!settings.enableSignups) {
+        throw new AuthenticationError('New user registration is currently disabled.', 403);
+    }
+    
+    // 3. Uniqueness Check
+    const existingUser = await prisma.user.findFirst({
+        where: { OR: [{ username: cleanedUsername }, { email: cleanedEmail }] },
+        select: { username: true, email: true }
+    });
+
+    if (existingUser) {
+        if (existingUser.username?.toLowerCase() === cleanedUsername) {
+            throw new AuthenticationError('Username is already taken.', 409);
+        }
+        if (existingUser.email?.toLowerCase() === cleanedEmail) {
+            throw new AuthenticationError('Email is already in use.', 409);
+        }
+    }
+
+    // 4. Hashing and OTP Generation
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const rawOtp = generateOtp();
+    const hashedOtp = await bcrypt.hash(rawOtp, saltRounds); 
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + OTP_EXPIRY_MINUTES);
+
+    // 5. Create User (Transactional)
+    const newUser = await prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+            data: {
+                username: cleanedUsername,
+                email: cleanedEmail,
+                password: hashedPassword,
+                role: UserRole.Member,
+                isActive: true, 
+                isVerified: false, 
+                verificationOtp: hashedOtp,
+                verificationOtpExpiry: otpExpiry,
+            },
+        });
+
+        // 6. Side Effect: Send Verification Email
+        await sendVerificationEmail(createdUser.email, rawOtp);
+
+        return createdUser;
+    });
+
+    // 7. Generate JWT
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        throw new Error('JWT_SECRET not configured in environment variables.');
+    }
+
+    const jti = `${newUser.id}-${Date.now()}`;
+    const payload = {
+        userId: newUser.id,
+        role: newUser.role,
+        jti: jti,
+    };
+
+    const token = jwt.sign(payload, secret, {
+        algorithm: 'HS256',
+        expiresIn: '24h',
+    });
+
+    // 8. Prepare Response
+    const {
+        password: _, verificationOtp: __, verificationOtpExpiry: ___, 
+        passwordResetOtp: ____, passwordResetOtpExpiry: _____, 
+        banReason: ______, banStartDate: _______,
+        ...userWithoutSensitiveFields
+    } = newUser;
+
+    return {
+        user: userWithoutSensitiveFields,
         token: token,
     };
 };
