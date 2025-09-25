@@ -1,324 +1,366 @@
-import {
-  PrismaClient,
-  UserRole,
-  CategoryType,
-  PostCondition,
-  TransactionStatus,
-  DisputeStatus,
-  UserReportStatus,
-  NotificationType,
-  Prisma,
-  User,
-  Category,
-  Post,
-} from '@prisma/client';
-import crypto from 'crypto';
+import { PrismaClient, UserRole, PostCondition, TransactionStatus, DisputeStatus, CategoryType, NotificationType, Prisma } from "@prisma/client";
+import crypto from "crypto";
 
 const prisma = new PrismaClient();
 
-// Helper functions
-const generateToken = (): string => crypto.randomBytes(20).toString('hex');
-const getRandomItem = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-const getRandomSubset = <T>(arr: T[], maxCount: number): T[] => {
-    const shuffled = [...arr].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, Math.floor(Math.random() * (maxCount + 1)));
-};
-const LOREM_IPSUM_SHORT = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
-const generateRandomText = (wordCount: number): string => {
-    const words = LOREM_IPSUM_SHORT.replace(/[.,]/g, '').split(' ');
-    let text = Array.from({ length: wordCount }, () => getRandomItem(words)).join(' ');
-    return text.charAt(0).toUpperCase() + text.slice(1) + '.';
-};
-const generateRandomHtml = (paragraphCount: number): string => {
-    let html = '';
-    for (let i = 0; i < paragraphCount; i++) {
-        html += `<p>${generateRandomText(Math.floor(Math.random() * 40) + 15)}</p>`;
-    }
-    return html;
-};
-const timeAgo = (days: number): Date => {
-    const date = new Date();
-    date.setDate(date.getDate() - (Math.random() * days));
-    return date;
-};
+// Utility to generate random tokens
+const generateToken = (): string => crypto.randomBytes(20).toString("hex");
 
 async function main() {
-    console.log(`🧹 Cleaning database...`);
-    // Delete in order of dependency to avoid foreign key constraint errors
-    await prisma.notification.deleteMany();
-    await prisma.adminAction.deleteMany();
-    await prisma.message.deleteMany();
-    await prisma.chat.deleteMany();
-    await prisma.review.deleteMany();
-    await prisma.dispute.deleteMany();
-    await prisma.userReport.deleteMany();
-    await prisma.activityLog.deleteMany();
-    await prisma.comment.deleteMany();
-    await prisma.transaction.deleteMany();
-    await prisma.post.deleteMany();
-    await prisma.bankAccount.deleteMany();
-    await prisma.user.deleteMany(); 
-    await prisma.category.deleteMany();
-    await prisma.marketplacePartner.deleteMany();
-    await prisma.backofficeSettings.deleteMany();
-    console.log(`🗑️ Database cleaned.`);
+  console.log("🧹 Cleaning database...");
+  // Ordered deletion to respect foreign key constraints
+  await prisma.notification.deleteMany();
+  await prisma.adminAction.deleteMany();
+  await prisma.activityLog.deleteMany();
+  await prisma.review.deleteMany();
+  await prisma.comment.deleteMany();
+  await prisma.dispute.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.chat.deleteMany();
+  await prisma.transaction.deleteMany();
+  await prisma.post.deleteMany();
+  await prisma.bankAccount.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.category.deleteMany();
+  console.log("🗑️ Database cleaned.");
 
-    console.log(`🌱 Seeding global settings...`);
-    await prisma.backofficeSettings.create({
-        data: {
-            maintenanceMode: false,
-            enablePostCreation: true,
-            enableAdvertisements: true,
-            enablePayments: true,
-            enableSignups: true,
-            enableLogins: true,
-            enableCommenting: true,
-            enableLikes: true,
-            enableFollowing: true,
-            enableChats: true,
-            enableCalling: true,
-            enableDisputes: true,
-        },
+  // ===== USERS =====
+  console.log("🌱 Seeding users...");
+  type UserData = {
+    id: string;
+    username: string;
+    email: string;
+    password: string;
+    role: UserRole;
+    isActive: boolean;
+    verificationOtp?: string;
+    passwordResetOtp?: string;
+    passwordResetOtpExpiry?: Date;
+    name?: string;
+    avatarUrl?: string;
+    address?: string;
+    city?: string;
+    zipCode?: string;
+    isVerified: boolean;
+  };
+
+  const usersData: UserData[] = [];
+  for (let i = 1; i <= 4; i++) {
+    usersData.push({
+      id: `user-id-${i}`,
+      username: `user${i}`,
+      email: `user${i}@example.com`,
+      password: `hashedpassword${i}`, // In a real app, this should be properly hashed
+      role: i === 1 ? UserRole.Admin : UserRole.Member,
+      isActive: true,
+      isVerified: i % 2 === 0,
+      verificationOtp: generateToken().substring(0, 6),
+      passwordResetOtp: generateToken().substring(0, 6),
+      passwordResetOtpExpiry: new Date(Date.now() + 15 * 60 * 1000), // OTPs should have a short expiry
+      name: `User ${i}`,
+      avatarUrl: `https://i.pravatar.cc/150?img=${i}`,
+      address: `Street ${i}`,
+      city: `City ${i}`,
+      zipCode: `1000${i}`,
     });
+  }
 
-    const mockPartners = [
-      {
-        id: 'gig', name: 'GIG Logistics', logoUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjx0ZXh0IHg9IjUwIiB5PSIyMyIgc3R5bGU9ImZvbnQ6Ym9sZCAyMHB4IHNhbnMtc2VyaWY7dGV4dC1hbmNob3I6bWlkZGxlO2ZpbGw6IzA2YjE0MiI+R0lHPC90ZXh0Pjx0ZXh0IHg9IjUwIiB5PSIzNiIgc3R5bGU9ImZvbnQ6N3B4IHNhbnMtc2VyaWY7dGV4dC1hbmNob3I6bWlkZGxlO2ZpbGw6I2U1NjI0ZCI+TG9naXN0aWNzPC90ZXh0Pjwvc3ZnPg==',
-        services: [ { id: 'gig-bike', name: 'Standard Bike', method: 'Bike', deliveryDurationDays: 2, fee: 3500 }, { id: 'gig-van', name: 'Medium Van', method: 'Van', deliveryDurationDays: 3, fee: 8000 }, { id: 'gig-air', name: 'Express Air', method: 'Air', deliveryDurationDays: 1, fee: 15000 }, ]
+  const users = [];
+  for (const u of usersData) {
+    users.push(await prisma.user.create({ data: u }));
+  }
+  console.log(`👤 Seeded ${users.length} users.`);
+  
+  // ===== BANK ACCOUNTS =====
+  console.log("🌱 Seeding bank accounts...");
+  for (let i = 1; i <= 4; i++) {
+    await prisma.bankAccount.create({
+      data: {
+        userId: users[i-1].id,
+        accountName: `User ${i}`,
+        accountNumber: `012345678${i}`,
+        bankName: "Bank Test",
+      }
+    });
+  }
+  console.log(`🏦 Seeded bank accounts.`);
+
+
+  // ===== CATEGORIES =====
+  console.log("🌱 Seeding categories...");
+  type CategoryData = { name: string; description: string; type: CategoryType };
+  const categoriesData: CategoryData[] = [];
+  for (let i = 1; i <= 4; i++) {
+    categoriesData.push({
+      name: `Category ${i}`,
+      description: `Description for category ${i}`,
+      type: i % 2 === 0 ? CategoryType.advert : CategoryType.discussion,
+    });
+  }
+
+  const categories = [];
+  for (const c of categoriesData) {
+    categories.push(await prisma.category.create({ data: c }));
+  }
+  console.log(`📚 Seeded ${categories.length} categories.`);
+
+  // ===== POSTS =====
+  console.log("🌱 Seeding posts...");
+  type PostData = {
+    title: string;
+    content: string;
+    isAdvert: boolean;
+    price?: number;
+    media?: Prisma.JsonValue;
+    brand?: string;
+    condition?: PostCondition;
+    pinnedAt?: Date;
+    isCommentingRestricted?: boolean;
+    isSoldOut?: boolean;
+    authorId: string;
+    categoryId: string;
+    lastActivityTimestamp: Date;
+  };
+
+  const postsData: PostData[] = [];
+  for (let i = 1; i <= 4; i++) {
+    const isAdvert = i % 2 === 0;
+    postsData.push({
+      title: `Post Title ${i}`,
+      content: `<p>Content for post ${i}</p>`,
+      isAdvert: isAdvert,
+      price: isAdvert ? i * 10 : undefined,
+      media: {
+          type: "image",
+          url: `https://picsum.photos/200/300?random=${i}`
       },
-      {
-        id: 'kwik', name: 'Kwik Delivery', logoUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjx0ZXh0IHg9IjUiIHk9IjMwIiBzdHlsZT0iZm9udDpib2xkIDI4cHggbW9ub3NwYWNlO2ZpbGw6IzAwMDAwMCI+S3dpay48L3RleHQ+PC9zdmc+',
-        services: [ { id: 'kwik-4hr', name: '4-Hour Bike', method: 'Bike', deliveryDurationDays: 1, fee: 2500 }, { id: 'kwik-car', name: 'Kwik Car', method: 'Car', deliveryDurationDays: 1, fee: 5000 }, ]
+      brand: isAdvert ? `Brand ${i}` : undefined,
+      condition: isAdvert ? PostCondition.New : undefined,
+      pinnedAt: i === 4 ? new Date() : undefined,
+      isCommentingRestricted: i === 3,
+      isSoldOut: false,
+      authorId: users[i - 1].id,
+      categoryId: categories[i - 1].id,
+      lastActivityTimestamp: new Date(),
+    });
+  }
+
+  const posts = [];
+  for (const p of postsData) {
+    posts.push(await prisma.post.create({ data: p as any }));
+  }
+  console.log(`✍️ Seeded ${posts.length} posts.`);
+
+  // ===== TRANSACTIONS =====
+  console.log("🌱 Seeding transactions...");
+  type TransactionData = {
+    amount: number;
+    status: TransactionStatus;
+    buyerId: string;
+    sellerId: string;
+    postId?: string;
+    trackingNumber?: string;
+    shippingProof?: Prisma.JsonValue;
+    shippedAt?: Date;
+    deliveredAt?: Date;
+  };
+
+  const transactionsData: TransactionData[] = [];
+  for (let i = 1; i <= 4; i++) {
+    transactionsData.push({
+      amount: i * 20,
+      status: TransactionStatus.Pending,
+      buyerId: users[i - 1].id,
+      sellerId: users[(i % 4)].id, // ensures no self-transaction
+      postId: posts[i - 1].id,
+      trackingNumber: `TRK${i}123`,
+      shippingProof: {
+          name: "shipping-proof.jpg",
+          url: `https://example.com/shipping/${i}`,
+          type: "image"
       },
-    ];
-    await prisma.marketplacePartner.createMany({
-        data: mockPartners.map(p => ({
-            ...p,
-            services: p.services as any,
-        })),
+      shippedAt: new Date(),
+      deliveredAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
     });
-    console.log(`🌍 Global settings seeded.`);
+  }
 
-    console.log(`👤 Seeding users...`);
-    const usersData: Prisma.UserCreateInput[] = [
-        { id: 'user-01', username: 'superadmin', password: 'password', email: 'superadmin@market.com', role: UserRole.SuperAdmin, name: 'Super Admin User', avatarUrl: 'https://i.pravatar.cc/150?u=superadmin', isVerified: true, isActive: true },
-        { id: 'user-08', username: 'admin2', password: 'password', email: 'admin2@market.com', role: UserRole.Admin, name: 'Admin Two', avatarUrl: 'https://i.pravatar.cc/150?u=admin2', isVerified: true, isActive: true },
-        { id: 'user-02', username: 'alice', password: 'password', email: 'alice@example.com', role: UserRole.Member, name: 'Alice', avatarUrl: 'https://i.pravatar.cc/150?u=alice', isVerified: true, isActive: true },
-        { id: 'user-03', username: 'anonymouspanda', password: 'password', email: 'panda@example.com', role: UserRole.Member, name: 'AnonymousPanda', avatarUrl: 'https://i.pravatar.cc/150?u=panda', isVerified: false, isActive: true },
-        { id: 'user-04', username: 'anonymousfox', password: 'password', email: 'fox@example.com', role: UserRole.Member, name: 'AnonymousFox', avatarUrl: 'https://i.pravatar.cc/150?u=fox', isVerified: false, isActive: false },
-        { id: 'user-05', username: 'anonymoustiger', password: 'password', email: 'tiger@example.com', role: UserRole.Member, name: 'AnonymousTiger', avatarUrl: 'https://i.pravatar.cc/150?u=tiger', isVerified: false, isActive: true, banExpiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), banReason: 'Spamming', banStartDate: new Date() },
-        { id: 'user-06', username: 'bob', password: 'password', email: 'bob@example.com', role: UserRole.Member, name: 'Bob', avatarUrl: 'https://i.pravatar.cc/150?u=bob', isVerified: true, isActive: true },
-        { id: 'user-07', username: 'charlie', password: 'password', email: 'charlie@example.com', role: UserRole.Member, name: 'Charlie', avatarUrl: 'https://i.pravatar.cc/150?u=charlie', isVerified: false, isActive: true },
-    ];
+  const transactions = [];
+  for (const t of transactionsData) {
+    transactions.push(await prisma.transaction.create({ data: t as any }));
+  }
+  console.log(`💸 Seeded ${transactions.length} transactions.`);
 
-    for (let i = 0; i < 50; i++) {
-        const name = `user${i+10}`;
-        usersData.push({
-            username: name,
-            password: 'password',
-            email: `${name}@example.com`,
-            role: 'Member',
-            name: `User ${i+10}`,
-            avatarUrl: `https://i.pravatar.cc/150?u=${name}`,
-            isActive: Math.random() > 0.1,
-            isVerified: Math.random() > 0.3,
-            verificationOtp: generateToken(),
-            verificationOtpExpiry: timeAgo(-1), // in the future
-        });
-    }
+  // ===== COMMENTS =====
+  console.log("🌱 Seeding comments...");
+  type CommentData = {
+    content: string;
+    media?: Prisma.JsonValue;
+    authorId: string;
+    postId: string;
+  };
 
-    for (const u of usersData) {
-      await prisma.user.create({ data: u });
-    }
-    const users = await prisma.user.findMany();
-    console.log(`👥 ${users.length} users seeded.`);
-
-    // Seed some bank accounts
-    const usersWithBankAccounts = getRandomSubset(users, 30);
-    for (const user of usersWithBankAccounts) {
-        await prisma.bankAccount.create({
-            data: {
-                userId: user.id,
-                accountName: user.name,
-                accountNumber: String(Math.floor(1000000000 + Math.random() * 9000000000)),
-                bankName: getRandomItem(['First Bank', 'UBA', 'GTBank', 'Access Bank']),
-            }
-        });
-    }
-    console.log(`🏦 Bank accounts seeded.`);
-    
-    // Seed social graph
-    for (const user of users) {
-        const usersToFollow = getRandomSubset(users.filter(u => u.id !== user.id), 20);
-        const usersToBlock = getRandomSubset(users.filter(u => u.id !== user.id), 2);
-        await prisma.user.update({
-            where: { id: user.id },
-            data: {
-                following: { connect: usersToFollow.map(u => ({ id: u.id })) },
-                blockedUsers: { connect: usersToBlock.map(u => ({ id: u.id })) },
-            }
-        });
-    }
-    console.log(`🕸️ Social graph seeded.`);
-
-    console.log(`📚 Seeding categories...`);
-    const mockCategoriesData = [
-        // Discussion Categories
-        { id: 'cat-disc-01', name: 'General Discussion', description: 'Talk about anything and everything.', type: 'discussion' },
-        { id: 'cat-disc-02', name: 'Technology', description: 'Gadgets, software, and the future.', type: 'discussion' },
-        { id: 'cat-disc-03', name: 'Gaming', description: 'Video games, board games, and gaming culture.', type: 'discussion' },
-        // Advert Categories
-        { id: 'cat-sale-elec-01', name: 'Computers & Laptops', description: 'Desktops, laptops, and components.', type: 'advert' },
-        { id: 'cat-sale-elec-02', name: 'Phones & Accessories', description: 'Smartphones, cases, chargers, and more.', type: 'advert' },
-        { id: 'cat-sale-home-01', name: 'Furniture', description: 'Sofas, tables, chairs, and bedroom sets.', type: 'advert' },
-    ];
-     await prisma.category.createMany({
-        data: mockCategoriesData.map(c => ({
-            id: c.id,
-            name: c.name,
-            description: c.description,
-            type: c.type as CategoryType,
-        }))
+  const commentsData: CommentData[] = [];
+  for (let i = 1; i <= 4; i++) {
+    const hasMedia = i % 2 === 0;
+    commentsData.push({
+      content: `Comment ${i} on post`,
+      media: hasMedia ? { type: "image", url: `https://picsum.photos/100/100?random=${i}` } : undefined,
+      authorId: users[i - 1].id,
+      postId: posts[i - 1].id,
     });
-    const categories = await prisma.category.findMany();
-    console.log(`📖 ${categories.length} categories seeded.`);
-    
-    console.log(`✍️ Seeding posts and comments...`);
-    const discussionCategories = categories.filter(c => c.type === 'discussion');
-    const advertCategories = categories.filter(c => c.type === 'advert');
-    
-    for (let i = 0; i < 250; i++) {
-        const isAdvert = Math.random() > 0.4;
-        const author = isAdvert ? getRandomItem(usersWithBankAccounts) : getRandomItem(users);
-        const category = isAdvert ? getRandomItem(advertCategories) : getRandomItem(discussionCategories);
-        const likedByUsers = getRandomSubset(users, 30);
-        
-        const postData: Prisma.PostCreateInput = {
-            title: generateRandomText(Math.floor(Math.random() * 8) + 5),
-            content: generateRandomHtml(Math.floor(Math.random() * 3) + 1),
-            author: { connect: { id: author.id } },
-            category: { connect: { id: category.id } },
-            isAdvert: isAdvert,
-            timestamp: timeAgo(60),
-            lastActivityTimestamp: new Date(),
-            likedBy: { connect: likedByUsers.map(u => ({ id: u.id })) },
-            isCommentingRestricted: Math.random() > 0.95,
-            isSoldOut: false,
-        };
+  }
 
-        if(isAdvert) {
-            postData.price = parseFloat((Math.random() * 100000 + 1000).toFixed(2));
-            postData.quantity = Math.floor(Math.random() * 50) + 1;
-            postData.condition = getRandomItem(['New', 'UsedLikeNew', 'UsedGood', 'UsedFair']) as PostCondition;
-            postData.brand = getRandomItem(['Apple', 'Samsung', 'Nike', 'Handmade', 'Generic']);
-            postData.media = {
-                type: 'image',
-                url: `https://picsum.photos/seed/${i}/800/600`,
-            } as Prisma.JsonObject;
-        }
-        
-        const post = await prisma.post.create({ data: postData });
+  for (const c of commentsData) {
+    await prisma.comment.create({ data: c as any });
+  }
+  console.log(`💬 Seeded ${commentsData.length} comments.`);
 
-        // Seed comments
-        const numComments = Math.floor(Math.random() * 30);
-        for(let j=0; j < numComments; j++) {
-            const commentAuthor = getRandomItem(users);
-            const commentLikedBy = getRandomSubset(users, 15);
-            
-            const comment = await prisma.comment.create({
-                data: {
-                    content: generateRandomText(Math.floor(Math.random() * 25) + 5),
-                    author: { connect: { id: commentAuthor.id } },
-                    post: { connect: { id: post.id } },
-                    likedBy: { connect: commentLikedBy.map(u => ({ id: u.id })) },
-                }
-            });
+  // ===== REVIEWS =====
+  console.log("🌱 Seeding reviews...");
+  type ReviewData = {
+    rating: number;
+    comment: string;
+    isVerifiedPurchase: boolean;
+    reviewerId: string;
+    userId: string;
+    transactionId?: string;
+  };
 
-            // Seed replies
-            if (Math.random() > 0.5) {
-                const numReplies = Math.floor(Math.random() * 4);
-                let parentId = comment.id;
-                for(let k=0; k < numReplies; k++) {
-                    const replyAuthor = getRandomItem(users);
-                    const reply = await prisma.comment.create({
-                        data: {
-                            content: generateRandomText(Math.floor(Math.random() * 15) + 3),
-                            author: { connect: { id: replyAuthor.id } },
-                            post: { connect: { id: post.id } },
-                            parent: { connect: { id: parentId } }
-                        }
-                    });
-                    // a small chance of deeper nesting
-                    if (Math.random() > 0.7) {
-                        parentId = reply.id;
-                    }
-                }
-            }
-        }
-    }
-    const postCount = await prisma.post.count();
-    const commentCount = await prisma.comment.count();
-    console.log(`📝 ${postCount} posts and ${commentCount} comments seeded.`);
+  const reviewsData: ReviewData[] = [];
+  for (let i = 1; i <= 4; i++) {
+    reviewsData.push({
+      rating: 4 + (i % 2),
+      comment: `Review ${i}`,
+      isVerifiedPurchase: true,
+      reviewerId: users[i - 1].id,
+      userId: users[(i % 4)].id,
+      transactionId: transactions[i - 1].id,
+    });
+  }
 
-    console.log(`💰 Seeding transactions...`);
-    const advertPosts = await prisma.post.findMany({ where: { isAdvert: true }});
-    for (let i = 0; i < 80; i++) {
-        const post = getRandomItem(advertPosts);
-        const seller = users.find(u => u.id === post.authorId);
-        const buyer = getRandomItem(users.filter(u => u.id !== post.authorId));
-        if (!seller || !buyer) continue;
-        
-        const status = getRandomItem(['Pending', 'Completed', 'InEscrow', 'Shipped', 'Delivered', 'Disputed', 'Cancelled']) as TransactionStatus;
-        
-        const transaction = await prisma.transaction.create({
-            data: {
-                post: { connect: { id: post.id } },
-                buyer: { connect: { id: buyer.id } },
-                seller: { connect: { id: seller.id } },
-                amount: post.price || 0,
-                status: status,
-                date: timeAgo(30)
-            }
-        });
-        
-        if (status === 'Completed' && Math.random() > 0.3) {
-             await prisma.review.create({
-                data: {
-                    rating: Math.floor(Math.random() * 5) + 1,
-                    comment: generateRandomText(15),
-                    isVerifiedPurchase: true,
-                    reviewer: { connect: { id: buyer.id } },
-                    user: { connect: { id: seller.id } },
-                    transaction: { connect: { id: transaction.id } }
-                }
-            });
-        }
+  for (const r of reviewsData) {
+    await prisma.review.create({ data: r });
+  }
+  console.log(`⭐ Seeded ${reviewsData.length} reviews.`);
 
-        if (status === 'Disputed') {
-             await prisma.dispute.create({
-                data: {
-                    transaction: { connect: { id: transaction.id } },
-                    buyer: { connect: { id: transaction.buyerId } },
-                    seller: { connect: { id: transaction.sellerId } },
-                    reason: 'Item not as described.',
-                    status: 'Open',
-                    chatHistory: [{ sender: buyer.name, message: generateRandomText(10), timestamp: new Date().toISOString() }] as any,
-                }
-            });
-        }
-    }
-    const transactionCount = await prisma.transaction.count();
-    console.log(`💸 ${transactionCount} transactions seeded.`);
+  // ===== NOTIFICATIONS =====
+  console.log("🌱 Seeding notifications...");
+  type NotificationData = {
+    type: NotificationType;
+    content: string;
+    link: string;
+    userId: string;
+    actorId?: string;
+    postId?: string;
+    transactionId?: string;
+    chatId?: string;
+    disputeId?: string;
+  };
 
-    console.log(`✅ Seeding finished successfully!`);
+  const notificationsData: NotificationData[] = [];
+  for (let i = 1; i <= 4; i++) {
+    notificationsData.push({
+      type: NotificationType.follow,
+      content: `Notification ${i}`,
+      link: `/posts/${posts[i - 1].id}`,
+      userId: users[i - 1].id,
+      actorId: users[(i % 4)].id,
+      postId: posts[i - 1].id,
+      transactionId: transactions[i - 1].id,
+    });
+  }
+
+  for (const n of notificationsData) {
+    await prisma.notification.create({ data: n });
+  }
+  console.log(`🔔 Seeded ${notificationsData.length} notifications.`);
+
+  // ===== DISPUTES =====
+  console.log("🌱 Seeding disputes...");
+  type DisputeData = {
+    reason: string;
+    status: DisputeStatus;
+    transactionId: string;
+    buyerId: string;
+    sellerId: string;
+    resolvedByAdminId?: string;
+    chatHistory: Prisma.JsonValue;
+  };
+
+  const disputesData: DisputeData[] = [];
+  for (let i = 1; i <= 4; i++) {
+    disputesData.push({
+      reason: `Dispute reason ${i}`,
+      status: DisputeStatus.Open,
+      transactionId: transactions[i - 1].id,
+      buyerId: transactions[i - 1].buyerId,
+      sellerId: transactions[i - 1].sellerId,
+      resolvedByAdminId: users[0].id, // Admin user
+      chatHistory: [
+        { sender: users[i-1].name, message: `This is the initial reason for dispute ${i}.`, timestamp: new Date().toISOString() }
+      ]
+    });
+  }
+  
+  for (const d of disputesData) {
+    await prisma.dispute.create({ data: d as any });
+  }
+  console.log(`🛡️ Seeded ${disputesData.length} disputes.`);
+
+  // ===== ADMIN ACTIONS =====
+  console.log("🌱 Seeding admin actions...");
+  type AdminActionData = {
+    action: string;
+    details?: string;
+    originalStatus?: string;
+    adminId: string;
+    transactionId: string;
+  };
+
+  const adminActionsData: AdminActionData[] = [];
+  for (let i = 1; i <= 4; i++) {
+    adminActionsData.push({
+      action: "Forced Payout",
+      details: `Action details ${i}`,
+      originalStatus: TransactionStatus.Pending,
+      adminId: users[0].id, // Admin user
+      transactionId: transactions[i - 1].id,
+    });
+  }
+
+  for (const a of adminActionsData) {
+    await prisma.adminAction.create({ data: a });
+  }
+  console.log(`⚙️ Seeded ${adminActionsData.length} admin actions.`);
+
+  // ===== ACTIVITY LOGS =====
+  console.log("🌱 Seeding activity logs...");
+  type ActivityLogData = { action: string; details: string; userId: string };
+  const activityLogsData: ActivityLogData[] = [];
+  for (let i = 1; i <= 4; i++) {
+    activityLogsData.push({
+      action: `Action ${i}`,
+      details: `Details for action ${i}`,
+      userId: users[i - 1].id,
+    });
+  }
+
+  for (const al of activityLogsData) {
+    await prisma.activityLog.create({ data: al });
+  }
+  console.log(`📜 Seeded ${activityLogsData.length} activity logs.`);
+
+  console.log("✅ Full seed complete for all models!");
 }
 
 main()
   .catch((e) => {
+    console.error("An error occurred during seeding:");
     console.error(e);
-    // process.exit(1) can cause issues in some environments.
-    // Throwing the error is usually sufficient.
-    throw e;
+    // FIX: Cast `process` to `any` to resolve a TypeScript error where 'exit' was not
+    // found on the Process type. This is a common issue in environments where Node.js
+    // globals are not fully typed, and this script is intended to run in Node.
+    (process as any).exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();
