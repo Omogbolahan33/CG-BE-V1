@@ -16,6 +16,6 @@ v1Router.use('/auth', authRoutes);
 // USER ROUTES
 // Mounts all routes from user.routes.ts under the path /api/v1/users
 // This makes the endpoint: GET /api/v1/users/me
-v1Router.use('/users', userRouter);
+v1Router.use('/users', userRoutes);
 
 export default v1Router;
