@@ -52,7 +52,18 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
             throw new AuthenticationError('User session invalid or account inactive.', 401);
         }
 
-        // 5. Attach user data to the request object
+        // 5. ***BUSINESS LOGIC: UPDATE lastSeen TIMESTAMP***
+        // We use a non-blocking update here so the middleware doesn't slow down the main thread.
+        // The main goal is high availability and low latency on every request.
+        prisma.user.update({
+            where: { id: userId },
+            data: { lastSeen: new Date() },
+        }).catch(err => {
+            console.error(`Failed to update lastSeen for user ${userId}:`, err);
+            // We still proceed with the request even if the lastSeen update fails.
+        });
+        
+        // 6. Attach user data to the request object
         req.userId = user.id;
         req.role = user.role;
         
