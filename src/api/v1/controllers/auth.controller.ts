@@ -6,7 +6,7 @@ import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
 import { BadRequestError } from '../../../errors/BadRequestError';
-import type { User } from '../../types';
+import type { User } from '../../../types';
 /**
  * Handles the POST /api/v1/auth/login endpoint.
  * @route POST /api/v1/auth/login
