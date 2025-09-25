@@ -12,8 +12,8 @@
     "prestart": "npm run build",
     "prisma:seed": "ts-node prisma/seed.ts"
   },
-    "prisma": {
-    "seed": "npm run prisma:seed"  
+  "prisma": {
+    "seed": "npm run prisma:seed"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -29,7 +29,10 @@
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
+    "@types/cookie-parser": "^1.4.9",
     "bcrypt": "^6.0.0",
+    "cookie-parse": "^0.4.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dompurify": "^3.2.7",
     "dotenv": "^17.2.2",
