@@ -646,8 +646,6 @@ export const resetPassword = async (data: ResetPasswordCredentials): Promise<{ s
 };
 
 
-
-
 // ----------------------------------- Main Service Logic ------------------------------------------------------------------
 
 
@@ -662,6 +660,9 @@ const blockJwt = async (jti: string, tokenExpirySeconds: number): Promise<void> 
     console.log(`SECURITY: JWT ID ${jti} blocked for ${tokenExpirySeconds} seconds.`);
     return Promise.resolve();
 };
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
 
 /**
  * API: Sign Out
@@ -700,4 +701,37 @@ export const signOut = async (token: string, userId: string): Promise<{ success:
 
     // Success response
     return { success: true };
+};
+
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+/**
+ * API: Get Current User
+ * @description Fetches the complete, non-sensitive data for the currently authenticated user.
+ * @param userId The ID of the logged-in user (from the JWT).
+ * @returns The user object with sensitive fields removed.
+ */
+export const getCurrentUser = async (userId: string): Promise<Omit<User, SensitiveUserFields>> => {
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+    });
+
+    if (!user) {
+        // This case should be prevented by authMiddleware, but is a safeguard.
+        throw new AuthenticationError('Authenticated user record not found.', 404);
+    }
+
+    // Explicitly exclude sensitive fields before returning
+    const {
+        password: _, verificationOtp: __, verificationOtpExpiry: ___, 
+        passwordResetOtp: ____, passwordResetOtpExpiry: _____, 
+        banReason: ______, banStartDate: _______,
+        ...userWithoutSensitiveFields
+    } = user;
+
+    return userWithoutSensitiveFields;
 };
