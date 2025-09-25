@@ -7,6 +7,9 @@ import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
 import { BadRequestError } from '../../../errors/BadRequestError';
 import type { User } from '../../../types';
+import { emitWebSocketEvent } from '../../../utils/ws.util'; 
+
+
 /**
  * Handles the POST /api/v1/auth/login endpoint.
  * @route POST /api/v1/auth/login
@@ -327,11 +330,12 @@ export const updateUserSettingsController = async (req: AuthenticatedRequest, re
             throw new AuthenticationError('Authentication required.', 401);
         }
         
-        // The service handles all complex business logic, validation, and side effects
         const updatedUser = await updateUserSettings(userId, settingsData);
         
-        // NOTE on Realtime: This is where you would emit the WebSocket event:
-        // io.emit(`userUpdate:${userId}`, updatedUser); 
+        // --- REAL-TIME REQUIREMENT IMPLEMENTATION ---
+        // The service returns the public-safe data, which is perfect for emitting.
+        emitWebSocketEvent(`userUpdate:${userId}`, updatedUser);
+        // -------------------------------------------
         
         return res.status(200).json({
             status: 'success',
