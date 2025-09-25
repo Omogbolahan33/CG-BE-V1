@@ -1,7 +1,7 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset } from '../../../../src/services/auth.service';
+import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -186,6 +186,34 @@ export const requestReset = async (req: Request, res: Response, next: NextFuncti
 
     } catch (error) {
         // Only internal errors (like DB failure) should reach here, not business logic errors.
+        next(error);
+    }
+};
+
+
+
+/**
+ * Handles the request to set a new password using an OTP.
+ */
+export const resetPasswordController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+
+        if (!email || !otp || !newPassword) {
+             throw new AuthenticationError('Email, OTP, and a new password are required.', 400);
+        }
+
+        const result = await resetPassword({ email, otp, newPassword });
+
+        // Success: 200 OK
+        return res.status(200).json({
+            status: 'success',
+            message: 'Password has been reset successfully. You may now log in.',
+            ...result, // { success: true }
+        });
+
+    } catch (error) {
+        // Catches AuthenticationError for invalid OTP/email/weak password
         next(error);
     }
 };
