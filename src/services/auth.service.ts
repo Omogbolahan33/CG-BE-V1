@@ -786,7 +786,7 @@ export const getUserProfile = async (userId: string): Promise<PublicUserProfile>
         address: ___, 
         city: ____, 
         zipCode: _____, 
-        bankAccount: ______, // BankAccount is a relation, so it will be undefined or null here if not explicitly included in the query.
+        //bankAccount: ______, // BankAccount is a relation, so it will be undefined or null here if not explicitly included in the query.
         verificationOtp: _______, 
         verificationOtpExpiry: ________, 
         passwordResetOtp: _________, 
