@@ -3,14 +3,23 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 import { cleanIdentifier } from '../utils/sanitizer';
-import { User, UserRole, BackofficeSettings } from '@prisma/client';
+import { UserRole, BackofficeSettings } from '@prisma/client';
 import { AuthenticationError } from '../errors/AuthenticationError'; 
 import { sendVerificationEmail } from '../utils/emailSender';
 import { BadRequestError } from '../errors/BadRequestError'; 
 import { NotFoundError } from '../errors/NotFoundError';
 import { ConflictError } from '../errors/ConflictError'; 
-import type { SensitiveUserFields, PrivateUserFields, PublicUserProfile } from '../types';
+import type {  User, SensitiveUserFields, PrivateUserFields, PublicUserProfile } from '../types';
 
+
+
+interface UpdateBankAccountPayload {
+  password: string; // For re-authentication
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  // Add other required BankAccount fields
+}
 
 // Define the shape of the login credentials
 interface LoginCredentials {
@@ -902,6 +911,96 @@ export const updateUserSettings = async (userId: string, settingsData: Partial<U
     });
 
     // 4. Prepare Response (Excluding sensitive fields)
+    const {
+        password: _, verificationOtp: __, verificationOtpExpiry: ___, 
+        passwordResetOtp: ____, passwordResetOtpExpiry: _____, 
+        banReason: ______, banStartDate: _______,
+        ...userWithoutSensitiveFields
+    } = updatedUser;
+
+    return userWithoutSensitiveFields;
+};
+
+
+
+
+/**
+ * API: Update User Bank Account
+ * @description Adds or updates a user's payout bank account with re-authentication and encryption.
+ * @param userId The ID of the authenticated user.
+ * @param payload The bank account data and the current password.
+ * @returns The updated user object with sensitive fields (like bank details) excluded.
+ */
+export const updateUserBankAccount = async (userId: string, payload: UpdateBankAccountPayload): Promise<Omit<User, SensitiveUserFields>> => {
+    const { password, accountName, accountNumber, bankName, ...otherData } = payload;
+    
+    // 1. Re-authentication Check (Security Requirement)
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+    });
+
+    if (!user) {
+        throw new AuthenticationError('User not found or session invalid.', 401);
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+        // Use a generic error message for security
+        throw new AuthenticationError('Password confirmation failed. Please enter your current password.', 401);
+    }
+
+    // 2. Encryption (Security Requirement)
+    const encryptedAccountName = encryptData(accountName);
+    const encryptedAccountNumber = encryptData(accountNumber);
+    const encryptedBankName = encryptData(bankName);
+    
+    // 3. Upsert/Update BankAccount (Transactional)
+    const updatedUser = await prisma.$transaction(async (tx) => {
+        // Check if a bank account already exists for this user
+        const existingBankAccount = await tx.bankAccounts.findFirst({
+            where: { userId: user.id },
+        });
+
+        const bankAccountData = {
+            accountName: encryptedAccountName,
+            accountNumber: encryptedAccountNumber,
+            bankName: encryptedBankName,
+            // Spread any other BankAccount fields from payload
+            ...otherData, 
+        };
+
+        if (existingBankAccount) {
+            // Update the existing record
+            await tx.bankAccounts.update({
+                where: { id: existingBankAccount.id },
+                data: bankAccountData,
+            });
+        } else {
+            // Create a new record and link it to the user
+            await tx.bankAccounts.create({
+                data: {
+                    ...bankAccountData,
+                    userId: user.id,
+                }
+            });
+        }
+        
+        // Auditing
+        await tx.activityLog.create({
+            data: {
+                userId: user.id,
+                action: 'BANK_ACCOUNT_UPDATE',
+                details: 'User bank account information successfully added/updated.',
+            }
+        });
+
+        // Return the updated user record (to get fresh data)
+        return tx.user.findUniqueOrThrow({
+            where: { id: userId },
+        });
+    });
+
+    // 4. Prepare Response (Exclude sensitive fields, including bankAccount relations)
     const {
         password: _, verificationOtp: __, verificationOtpExpiry: ___, 
         passwordResetOtp: ____, passwordResetOtpExpiry: _____, 
