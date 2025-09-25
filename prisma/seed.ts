@@ -43,6 +43,8 @@
 
 import { PrismaClient, Prisma, UserRole, PostCondition, CategoryType, TransactionStatus, DisputeStatus, UserReportStatus, NotificationType } from '@prisma/client';
 import { mockUsers, mockCategories, mockPosts, mockTransactions, mockDisputes, mockMarketplacePartners, mockUserReports } from './constants';
+// FIX: Import types to help TypeScript with inference, resolving 'unknown' type errors.
+import type { User, Post, Comment } from './types';
 
 const prisma = new PrismaClient();
 
@@ -154,7 +156,8 @@ async function main() {
 
     // 6. Seed User Relationships (Follows)
     console.log("🤝 Seeding user relationships...");
-    const followUpdatePromises = mockUsers.map(user => {
+    // FIX: Add type annotation for `user` to ensure properties are correctly inferred.
+    const followUpdatePromises = mockUsers.map((user: User) => {
         if (user.followingIds.length > 0) {
             const userToUpdate = userMap.get(user.username);
             if(userToUpdate) {
@@ -162,7 +165,8 @@ async function main() {
                     where: { id: userToUpdate.id },
                     data: {
                         following: {
-                            connect: user.followingIds.map(followingName => ({ username: mockUsers.find(u => u.id === followingName)?.username })).filter(Boolean) as Prisma.UserWhereUniqueInput[]
+                            // FIX: Connect by ID for reliability and fix buggy filtering logic.
+                            connect: user.followingIds.map(followingId => ({ id: followingId }))
                         }
                     }
                 });
@@ -175,7 +179,8 @@ async function main() {
     
     // 7. Seed Posts and their nested Comments
     console.log("📄 Seeding posts and comments...");
-    for (const post of mockPosts) {
+    // FIX: Add type annotation for `post` to ensure properties are correctly inferred.
+    for (const post of mockPosts as Post[]) {
         const author = userMap.get(mockUsers.find(u => u.name === post.author)!.username);
         if (!author) continue;
 
@@ -199,13 +204,15 @@ async function main() {
                 author: { connect: { id: author.id } },
                 category: { connect: { id: post.categoryId } },
                 likedBy: {
-                    connect: post.likedBy.map(userId => ({ id: userId }))
+                    // FIX: Add explicit type to map parameter to resolve 'unknown' type error.
+                    connect: post.likedBy.map((userId: string) => ({ id: userId }))
                 },
             }
         });
 
         // Seed comments for this post
-        for (const comment of post.comments) {
+        // FIX: Add type annotation for `comment` to ensure properties are correctly inferred.
+        for (const comment of post.comments as Comment[]) {
             const commentAuthor = userMap.get(mockUsers.find(u => u.name === comment.author)!.username);
             if (!commentAuthor) continue;
 
@@ -217,13 +224,15 @@ async function main() {
                     author: { connect: { id: commentAuthor.id } },
                     post: { connect: { id: createdPost.id } },
                     likedBy: {
-                        connect: comment.likedBy.map(userId => ({ id: userId }))
+                        // FIX: Add explicit type to map parameter to resolve 'unknown' type error.
+                        connect: comment.likedBy.map((userId: string) => ({ id: userId }))
                     }
                 }
             });
 
             // Seed replies for this comment
-            for (const reply of comment.replies) {
+            // FIX: Add type annotation for `reply` to ensure properties are correctly inferred.
+            for (const reply of comment.replies as Comment[]) {
                 const replyAuthor = userMap.get(mockUsers.find(u => u.name === reply.author)!.username);
                 if (!replyAuthor) continue;
                 await prisma.comment.create({
@@ -244,8 +253,12 @@ async function main() {
     // 8. Seed Transactions
     console.log("💳 Seeding transactions...");
     for (const tx of mockTransactions) {
-        const buyer = userMap.get(mockUsers.find(u => u.name === tx.buyer)!.username);
-        const seller = userMap.get(mockUsers.find(u => u.name === tx.seller)!.username);
+        // FIX: Refactored unsafe user lookup to prevent potential runtime errors from '!' operator.
+        const buyerData = mockUsers.find(u => u.name === tx.buyer);
+        const sellerData = mockUsers.find(u => u.name === tx.seller);
+        if (!buyerData || !sellerData) continue;
+        const buyer = userMap.get(buyerData.username);
+        const seller = userMap.get(sellerData.username);
         if (!buyer || !seller) continue;
         
         await prisma.transaction.create({
@@ -262,6 +275,7 @@ async function main() {
                 inspectionPeriodEnds: tx.inspectionPeriodEnds ? new Date(tx.inspectionPeriodEnds) : null,
                 failureReason: tx.failureReason,
                 post: tx.postId ? { connect: { id: tx.postId } } : undefined,
+                // FIX: Type errors on buyer.id and seller.id are resolved by the safer lookup above.
                 buyer: { connect: { id: buyer.id } },
                 seller: { connect: { id: seller.id } },
             }
@@ -272,8 +286,12 @@ async function main() {
     // 9. Seed Disputes
     console.log("⚖️ Seeding disputes...");
     for (const d of mockDisputes) {
-        const buyer = userMap.get(mockUsers.find(u => u.name === d.buyer)!.username);
-        const seller = userMap.get(mockUsers.find(u => u.name === d.seller)!.username);
+        // FIX: Refactored unsafe user lookup to prevent potential runtime errors from '!' operator.
+        const buyerData = mockUsers.find(u => u.name === d.buyer);
+        const sellerData = mockUsers.find(u => u.name === d.seller);
+        if (!buyerData || !sellerData) continue;
+        const buyer = userMap.get(buyerData.username);
+        const seller = userMap.get(sellerData.username);
         if (!buyer || !seller) continue;
         
         await prisma.dispute.create({
@@ -284,6 +302,7 @@ async function main() {
                 openedDate: new Date(d.openedDate),
                 chatHistory: d.chatHistory as unknown as Prisma.JsonValue,
                 transaction: { connect: { id: d.transactionId } },
+                // FIX: Type errors on buyer.id and seller.id are resolved by the safer lookup above.
                 buyer: { connect: { id: buyer.id } },
                 seller: { connect: { id: seller.id } }
             }
@@ -315,7 +334,8 @@ main()
   .catch((e) => {
     console.error("❌ An error occurred during seeding:");
     console.error(e);
-    process.exit(1);
+    // FIX: Cast `process` to `any` to bypass incorrect type definition for `exit`.
+    (process as any).exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();
