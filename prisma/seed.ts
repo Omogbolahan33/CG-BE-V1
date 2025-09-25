@@ -105,7 +105,8 @@ async function main() {
             id: p.id,
             name: p.name,
             logoUrl: p.logoUrl,
-            services: p.services as unknown as Prisma.JsonValue,
+            // FIX: Replaced 'as unknown as Prisma.JsonValue' with 'as any' to resolve a TypeScript type inference issue.
+            services: p.services as any,
         })),
     });
     console.log("✅ Marketplace partners seeded.");
@@ -205,10 +206,12 @@ async function main() {
                 quantity: post.quantity,
                 brand: post.brand,
                 condition: post.condition ? post.condition.replace(/Used - /g, 'Used').replace(' ', '') as PostCondition : null,
-                deliveryOptions: post.deliveryOptions as unknown as Prisma.JsonValue,
+                // FIX: Replaced 'as unknown as Prisma.JsonValue' with 'as any' to resolve a TypeScript type inference issue.
+                deliveryOptions: post.deliveryOptions as any,
                 pinnedAt: post.pinnedAt ? new Date(post.pinnedAt) : null,
                 isCommentingRestricted: post.isCommentingRestricted,
-                media: post.media as unknown as Prisma.JsonValue,
+                // FIX: Replaced 'as unknown as Prisma.JsonValue' with 'as any' to resolve a TypeScript type inference issue.
+                media: post.media as any,
                 author: { connect: { id: author.id } },
                 category: { connect: { id: post.categoryId } },
                 likedBy: {
@@ -324,7 +327,8 @@ async function main() {
                 reason: d.reason,
                 status: d.status as DisputeStatus,
                 openedDate: new Date(d.openedDate),
-                chatHistory: d.chatHistory as unknown as Prisma.JsonValue,
+                // FIX: Replaced 'as unknown as Prisma.JsonValue' with 'as any' to resolve a TypeScript type inference issue.
+                chatHistory: d.chatHistory as any,
                 transaction: { connect: { id: d.transactionId } },
                 buyer: { connect: { id: buyer.id } },
                 seller: { connect: { id: seller.id } }
