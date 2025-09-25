@@ -6,7 +6,7 @@ import { User, BankAccount } from '@prisma/client';
 
 // Re-export the core types for use across the application
 export type User = User;
-export type BankAccount = BankAccounts;
+export type BankAccount = BankAccount;
 
 // --- Define Custom Types for API Responses/Requests ---
 
