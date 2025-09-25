@@ -484,3 +484,72 @@ export const resendVerificationOtp = async (userId: string): Promise<{ success: 
     
     return { success: true };
 };
+
+
+
+/**
+ * API: Request Password Reset
+ * @description Initiates the password reset process by generating and sending an OTP.
+ * @param email The user's email address.
+ * @returns Always returns { success: true } to prevent email enumeration.
+ */
+export const requestPasswordReset = async (email: string): Promise<{ success: boolean }> => {
+    const saltRounds = 10;
+    const OTP_EXPIRY_MINUTES = 15;
+
+    // 1. Sanitize and Find User (Case-insensitive)
+    const cleanedEmail = cleanIdentifier(email).toLowerCase();
+
+    // We do NOT use findUnique here because we want to avoid throwing on not found.
+    const user = await prisma.user.findFirst({
+        where: { email: cleanedEmail },
+    });
+
+    // 2. Core Logic: Only proceed if user is found
+    if (user) {
+        // NOTE: This is where rate-limiting logic would be applied (e.g., checking Redis or a timestamp in the DB)
+        
+        // a. Generate and Hash OTP
+        const rawOtp = generateOtp(); // Reusing the 6-digit helper
+        const hashedOtp = await bcrypt.hash(rawOtp, saltRounds); 
+        const otpExpiry = new Date();
+        otpExpiry.setMinutes(otpExpiry.getMinutes() + OTP_EXPIRY_MINUTES);
+
+        // b. Update User Record (Atomic Transaction)
+        await prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: user.id },
+                data: {
+                    passwordResetOtp: hashedOtp,
+                    passwordResetOtpExpiry: otpExpiry,
+                }
+            });
+
+            // c. Side Effect: Send Email
+            // NOTE: You'll need a new stub for this, or update your emailSender utility.
+            // For now, we'll log it using a generic sender stub.
+            await sendPasswordResetEmail(user.email, rawOtp);
+            
+            // d. Auditing
+            await tx.activityLog.create({
+                data: {
+                    userId: user.id,
+                    action: 'PASSWORD_RESET_REQUEST',
+                    details: 'Password reset OTP generated and sent.',
+                }
+            });
+        });
+    }
+
+    // 3. Security Note: Always return success to prevent email enumeration attacks.
+    return { success: true };
+};
+
+// NOTE: You need this new stub function in your email utility
+/**
+ * STUB: Simulates sending a password reset email.
+ */
+export const sendPasswordResetEmail = async (email: string, otp: string): Promise<void> => {
+    console.log(`EMAIL STUB: Sent password reset code ${otp} to ${email}`);
+    return Promise.resolve();
+};
