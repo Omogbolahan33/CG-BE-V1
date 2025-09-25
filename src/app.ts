@@ -6,7 +6,6 @@ import cors from 'cors'; // You'd typically install and use 'cors'
 import v1Router from './api/v1/routes'; // We will define this index file
 import cookieParser from 'cookie-parser';
 
-import v1Router from './api/v1/routes'; 
 import { AuthenticationError } from './errors/AuthenticationError'; 
 
 
