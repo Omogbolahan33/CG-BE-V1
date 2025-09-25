@@ -7,7 +7,46 @@
     "start": "node dist/server.js", // Production: Runs the compiled JS
     "dev": "ts-node-dev --respawn server.ts", // Development: Runs the TS source file in the root
     "build": "tsc",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "studio": "npx prisma studio",
+    "seed": "ts-node prisma/seed.ts"
   },
-  // ... rest of the file
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/client": "^6.15.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/node-schedule": "^2.1.8",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^4.2.1",
+    "node-schedule": "^2.1.1",
+    "nodemailer": "^6.9.9",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0",
+    "ts-node": "^10.9.2",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/express-rate-limit": "^6.0.0",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/morgan": "^1.9.9",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^20.12.12",
+    "@types/nodemailer": "^6.4.12",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.6",
+    "nodemon": "^3.1.0",
+    "prisma": "^6.15.0",
+    "typescript": "^5.4.5"
+  }
 }
