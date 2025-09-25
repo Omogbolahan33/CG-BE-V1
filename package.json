@@ -8,8 +8,8 @@
     "dev": "ts-node-dev --respawn server.ts",
     "build": "tsc",
     "prisma:generate": "prisma generate",
-    "postinstall": "npm run prisma:generate", 
-    "prestart": "npm run build"  
+    "postinstall": "npm run prisma:generate",
+    "prestart": "npm run build"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
