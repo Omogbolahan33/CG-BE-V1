@@ -6,7 +6,9 @@ import { getCurrentUserController,
         updateUserSettingsController, 
         updateUserBankAccountController, 
         requestFollowController,
-       cancelFollowRequestController,acceptFollowRequestController } from '../controllers/auth.controller'; 
+       cancelFollowRequestController, 
+        acceptFollowRequestController, 
+        declineFollowRequestController } from '../controllers/auth.controller'; 
 
 const router = Router();
 
@@ -36,6 +38,10 @@ router.delete('/:userId/follow-request', authMiddleware, cancelFollowRequestCont
 // Route for accepting a follow request <-- NEW ROUTE
 // Endpoint: POST /api/v1/users/follow-requests/{requesterId}/accept
 router.post('/follow-requests/:requesterId/accept', authMiddleware, acceptFollowRequestController);
+
+// Route for declining a follow request <-- NEW ROUTE
+// Endpoint: POST /api/v1/users/follow-requests/{requesterId}/decline
+router.post('/follow-requests/:requesterId/decline', authMiddleware, declineFollowRequestController);
 
 
 export default router;
