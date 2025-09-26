@@ -13,7 +13,8 @@ import { loginUser,
         getUserProfile, 
         updateUserSettings, 
         updateUserBankAccount, 
-        requestFollow, cancelFollowRequest } from '../../../../src/services/auth.service';
+        requestFollow, 
+        cancelFollowRequest, acceptFollowRequest } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -440,6 +441,34 @@ export const cancelFollowRequestController = async (req: AuthenticatedRequest, r
         return res.status(200).json({
             status: 'success',
             message: 'Follow request cancelled.',
+            ...result,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Accept Follow Request (POST /users/follow-requests/{requesterId}/accept)
+ * @description Handles the request to accept a follow request.
+ */
+export const acceptFollowRequestController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const currentUserId = req.userId; // The user accepting (the target)
+        const requesterId = req.params.requesterId; // The user who sent the request (the follower)
+
+        if (!currentUserId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+
+        const result = await acceptFollowRequest(currentUserId, requesterId);
+        
+        return res.status(200).json({
+            status: 'success',
+            message: 'Follow request accepted.',
             ...result,
         });
 
