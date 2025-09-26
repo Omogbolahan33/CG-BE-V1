@@ -1285,3 +1285,56 @@ export const declineFollowRequest = async (currentUserId: string, requesterId: s
 
     return { success: true };
 };
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+/**
+ * API: Unfollow User
+ * @description Removes a follow relationship between the current user and the target user.
+ * @param currentUserId The ID of the user performing the unfollow.
+ * @param targetUserId The ID of the user being unfollowed.
+ * @returns { success: boolean }
+ */
+export const unfollowUser = async (currentUserId: string, targetUserId: string): Promise<{ success: boolean }> => {
+    
+    // 1. Pre-check: Ensure the target user exists
+    const targetUser = await prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true }
+    });
+
+    if (!targetUser) {
+        throw new NotFoundError(`User with ID ${targetUserId} not found.`, 404);
+    }
+    
+    // 2. Core Logic: Atomic Disconnection
+    // We update the current user (disconnecting the target from their 'following' list)
+    // AND update the target user (disconnecting the current user from their 'followers' list).
+    await prisma.$transaction([
+        // Update the current user (the unfollower)
+        prisma.user.update({
+            where: { id: currentUserId },
+            data: {
+                following: {
+                    disconnect: { id: targetUserId }, // Remove target from current user's 'following' list
+                },
+            },
+        }),
+        
+        // Update the target user (the unfollowed)
+        prisma.user.update({
+            where: { id: targetUserId },
+            data: {
+                followers: {
+                    disconnect: { id: currentUserId }, // Remove current user from target's 'followers' list
+                },
+            },
+        }),
+    ]);
+    
+    // Note: If the relationship didn't exist, Prisma performs a safe no-op.
+
+    return { success: true };
+};
