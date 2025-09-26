@@ -19,12 +19,12 @@ import { loginUser,
         declineFollowRequest, 
         unfollowUser, 
         blockUser, 
-        unblockUser, addReview } from '../../../../src/services/auth.service';
+        unblockUser, addReview, reportUser } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
 import { BadRequestError } from '../../../errors/BadRequestError';
-import type { User, UpdateBankAccountPayload, AddReviewPayload } from '../../../types';
+import type { User, UpdateBankAccountPayload, AddReviewPayload, ReportUserPayload } from '../../../types';
 import { emitWebSocketEvent } from '../../../utils/ws.util'; 
 
 
@@ -610,6 +610,40 @@ export const addReviewController = async (req: AuthenticatedRequest, res: Respon
             status: 'success',
             message: 'Review submitted successfully.',
             data: newReview,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Report User (POST /users/report)
+ * @description Handles the submission of a user report.
+ */
+export const reportUserController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const currentUserId = req.userId; // The user submitting the report
+        const payload: ReportUserPayload = req.body;
+
+        if (!currentUserId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+        
+        // Basic payload validation
+        if (!payload.reportedUserId || !payload.reason || !payload.details) {
+            throw new BadRequestError('Reported user ID, reason, and details are required.', 400);
+        }
+
+        const result = await reportUser(currentUserId, payload);
+        
+        // @response: 201 Created
+        return res.status(201).json({
+            status: 'success',
+            message: 'Report submitted successfully. Thank you for your feedback.',
+            ...result,
         });
 
     } catch (error) {
