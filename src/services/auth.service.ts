@@ -1,18 +1,21 @@
-import prisma from '../utils/prisma';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
-import { cleanIdentifier } from '../utils/sanitizer';
+    //Prisma instances
+import prisma from '../utils/prisma';
 import { UserRole, BackofficeSettings } from '@prisma/client';
+import type {  User, SensitiveUserFields, PrivateUserFields, PublicUserProfile, NotificationType } from '../types';
+  //Error handlers
 import { AuthenticationError } from '../errors/AuthenticationError'; 
-import { sendVerificationEmail } from '../utils/emailSender';
 import { BadRequestError } from '../errors/BadRequestError'; 
 import { NotFoundError } from '../errors/NotFoundError';
 import { ConflictError } from '../errors/ConflictError'; 
 import { ForbiddenError } from '../errors/ForbiddenError'; 
+  //Utility functions
+import { cleanIdentifier } from '../utils/sanitizer';
 import { encryptData } from '../utils/crypto.util';
 import { emitWebSocketEvent } from '../utils/ws.util'; 
-import type {  User, SensitiveUserFields, PrivateUserFields, PublicUserProfile, NotificationType } from '../types';
+import { sendVerificationEmail } from '../utils/emailSender';
 
 
 
