@@ -90,3 +90,9 @@ export interface UpdateBankAccountPayload {
   bankName: string;
   // Add any other required BankAccount fields here (e.g., routingNumber, swiftCode)
 }
+
+export interface AddReviewPayload {
+    rating: number; // e.g., 1 to 5
+    comment: string;
+    transactionId?: string;
+}
