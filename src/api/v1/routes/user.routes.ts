@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../../middlewares/auth.middleware';
 // Import the new controller function
-import { getCurrentUserController, getUserProfileController, updateUserSettingsController, updateUserBankAccountController, requestFollowController } from '../controllers/auth.controller'; 
+import { getCurrentUserController, 
+        getUserProfileController, 
+        updateUserSettingsController, 
+        updateUserBankAccountController, 
+        requestFollowController,
+       cancelFollowRequestController } from '../controllers/auth.controller'; 
 
 const router = Router();
 
@@ -16,12 +21,16 @@ router.get('/:userId', authMiddleware, getUserProfileController);
 // Endpoint: GET /api/v1/users/{userId}
 router.get('/:userId', authMiddleware, getUserProfileController); 
 
-// Route for UPDATING the user's bank account <-- NEW ROUTE
+// Route for UPDATING the user's bank account
 // Endpoint: PUT /api/v1/users/me/bank-account
 router.put('/me/bank-account', authMiddleware, updateUserBankAccountController);
 
-// Route for requesting to follow a user <-- NEW ROUTE
+// Route for requesting to follow a user
 // Endpoint: POST /api/v1/users/{userId}/follow
 router.post('/:userId/follow', authMiddleware, requestFollowController); 
+
+// Route for cancelling a follow request
+// Endpoint: DELETE /api/v1/users/{userId}/follow-request
+router.delete('/:userId/follow-request', authMiddleware, cancelFollowRequestController);
 
 export default router;
