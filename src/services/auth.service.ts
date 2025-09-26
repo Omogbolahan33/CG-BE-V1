@@ -18,7 +18,7 @@ import type {  User,
              ResetPasswordCredentials, 
              Review, 
              Transaction, 
-             AddReviewPayload} from '../types';
+             AddReviewPayload, ReportUserPayload,UserReportStatus } from '../types';
   //Error handlers
 import { AuthenticationError } from '../errors/AuthenticationError'; 
 import { BadRequestError } from '../errors/BadRequestError'; 
@@ -1550,4 +1550,89 @@ export const addReview = async (
     });
 
     return newReview;
+};
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+/**
+ * API: Report User
+ * @description Submits a report against another user, creating a report record and notifying admins.
+ * @param currentUserId The ID of the user submitting the report.
+ * @param reportData The report details (reportedUserId, reason, details, attachmentUrl).
+ * @returns { success: boolean }
+ */
+export const reportUser = async (currentUserId: string, reportData: ReportUserPayload): Promise<{ success: boolean }> => {
+    
+    const { reportedUserId, reason, details, attachmentUrl } = reportData;
+
+    // @businessLogic: Pre-conditions: A user cannot report themselves.
+    if (currentUserId === reportedUserId) {
+        // @errorHandling: 400 Bad Request
+        throw new BadRequestError("You cannot report yourself.", 400);
+    }
+    
+    // Check if the reported user exists
+    const reportedUser = await prisma.user.findUnique({
+        where: { id: reportedUserId },
+        select: { id: true, username: true } // Select username for the notification content
+    });
+
+    // @errorHandling: 404 Not Found
+    if (!reportedUser) {
+        throw new NotFoundError(`User with ID ${reportedUserId} not found.`, 404);
+    }
+
+    // @coreLogic: 1. Create a new UserReport record with status 'Open'.
+    const newReport = await prisma.userReport.create({
+        data: {
+            reporterId: currentUserId,              // 2. Link the reporter
+            reportedUserId: reportedUserId,         // 2. Link the reported user
+            reason: reason,
+            details: details,
+            attachmentUrl: attachmentUrl,           // 3. Store the URL
+            status: 'Open' as UserReportStatus,     // 1. Set status to 'Open'
+        }
+    });
+
+    // @sideEffects: Send a system notification to all Admins and Super Admins.
+    // 1. Find all admin users
+    const adminUsers = await prisma.user.findMany({
+        where: {
+            role: {
+                in: ['Admin', 'SuperAdmin'] // Assuming these roles exist
+            }
+        },
+        select: { id: true }
+    });
+
+    // 2. Prepare notifications for bulk creation
+    const notifications = adminUsers.map(admin => ({
+        userId: admin.id,
+        actorId: currentUserId,
+        type: 'system' as NotificationType,
+        content: `New User Report (#${newReport.id}) submitted against ${reportedUser.username}.`,
+        link: `/backoffice/reports/${newReport.id}`, // Link to admin panel
+        userReportId: newReport.id,
+    }));
+
+    // 3. Create all notifications in one go
+    await prisma.notification.createMany({
+        data: notifications,
+        skipDuplicates: true,
+    });
+
+    // @realtime: Emit a newReport event to a dedicated admin WebSocket channel.
+    // This is typically a single channel all admin sessions subscribe to.
+    emitWebSocketEvent(`admin:reports`, { 
+        type: 'newReport', 
+        data: { 
+            reportId: newReport.id, 
+            reportedUsername: reportedUser.username 
+        } 
+    });
+
+
+    return { success: true };
 };
