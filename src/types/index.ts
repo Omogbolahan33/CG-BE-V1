@@ -110,5 +110,3 @@ export interface ReportUserPayload {
     details: string;
     attachmentUrl?: string; // Changed from File to URL string for API consistency
 }
-
-export type UserReportStatus = 'Open' | 'UnderReview' | 'Closed'; 
