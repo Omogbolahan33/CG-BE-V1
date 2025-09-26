@@ -6,7 +6,7 @@ import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
 import { BadRequestError } from '../../../errors/BadRequestError';
-import type { User } from '../../../types';
+import type { User, UpdateBankAccountPayload  } from '../../../types';
 import { emitWebSocketEvent } from '../../../utils/ws.util'; 
 
 
