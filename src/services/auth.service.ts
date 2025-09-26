@@ -1038,7 +1038,7 @@ export const requestFollow = async (currentUserId: string, targetUserId: string)
         // Fetch current user's role and blocked list
         prisma.user.findUnique({
             where: { id: currentUserId },
-            select: { id: true, role: true, username: true, blockedUserIds: true }
+            select: { id: true, role: true, username: true, blockedUsers: { select: { id: true } }
         }),
         // Fetch target user's follower info and blocked list
         prisma.user.findUnique({
@@ -1046,7 +1046,7 @@ export const requestFollow = async (currentUserId: string, targetUserId: string)
             select: { 
                 followedBy: { select: { id: true } }, // Select IDs for checking
                 pendingFollowerIds: true, 
-                blockedUserIds: true 
+                blockedBy: { select: { id: true } } // WHO has blocked the target user
             }
         }),
         // Fetch Backoffice settings (assuming only one settings record exists)
@@ -1087,10 +1087,16 @@ export const requestFollow = async (currentUserId: string, targetUserId: string)
         throw new BadRequestError("A follow request is already pending.", 400);
     }
     
+
     // 1.5 Neither user can have blocked the other.
-    const isTargetBlockedByCurrent = currentUser.blockedUserIds.includes(targetUserId); 
-    const isCurrentBlockedByTarget = targetUser.blockedUserIds.includes(currentUserId);
     
+    // Check 1: Has the current user blocked the target user?
+    const isTargetBlockedByCurrent = currentUser.blockedUsers.some(blocked => blocked.id === targetUserId);
+    
+    // Check 2: Has the target user blocked the current user?
+    // We check the target user's 'blockedBy' list to see if the current user's ID is present.
+    const isCurrentBlockedByTarget = targetUser.blockedBy.some(blocker => blocker.id === currentUserId);
+     
     if (isTargetBlockedByCurrent || isCurrentBlockedByTarget) {
         throw new ForbiddenError("You cannot follow this user due to a block.", 403);
     }
@@ -1102,7 +1108,7 @@ export const requestFollow = async (currentUserId: string, targetUserId: string)
         await tx.user.update({
             where: { id: targetUserId },
             data: {
-                pendingFollowerIds: { push: currentUserId },
+                pendingFollowers: { push: currentUserId },
             }
         });
 
