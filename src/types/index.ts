@@ -35,3 +35,58 @@ export type PrivateUserFields =
     | 'passwordResetOtpExpiry';
     
 export type PublicUserProfile = Omit<User, PrivateUserFields>;
+
+export interface UpdateBankAccountPayload {
+  password: string; // For re-authentication
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  // Add other required BankAccount fields
+}
+
+// Define the shape of the login credentials
+export interface LoginCredentials {
+  identifier: string;
+  password: string;
+  // Metadata fields for logging (often passed from the controller)
+  ip?: string;
+  userAgent?: string;
+}
+// Define the expected successful response type
+export interface LoginResponse {
+  user: Omit<User, SensitiveUserFields>;
+  token: string;
+}
+
+// Define the shape of the signup credentials
+export interface SignUpCredentials {
+  username: string;
+  email: string;
+  password: string;
+}
+// Define the expected successful response type
+export interface SignUpResponse {
+    user: Omit<User, SensitiveUserFields>; 
+    token: string;
+}
+// Define the shape of the verifyEmail credentials
+export interface VerifyEmailByOtpCredentials {
+  userId: string;
+  otp: string;
+}
+
+// Define the shape of the ResetPassword credentials
+export interface ResetPasswordCredentials {
+  email: string;
+  otp: string;
+  newPassword: string;
+}
+
+// Define the required structure for the bank account update API request body
+export interface UpdateBankAccountPayload {
+  password: string; // Required for re-authentication
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  // Add any other required BankAccount fields here (e.g., routingNumber, swiftCode)
+}
