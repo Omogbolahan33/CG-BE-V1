@@ -16,7 +16,7 @@ import { loginUser,
         requestFollow, 
         cancelFollowRequest, 
         acceptFollowRequest, 
-        declineFollowRequest, unfollowUser } from '../../../../src/services/auth.service';
+        declineFollowRequest, unfollowUser, blockUser, unblockUser} from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -530,6 +530,50 @@ export const unfollowUserController = async (req: AuthenticatedRequest, res: Res
             ...result,
         });
 
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Block User (POST /users/{userId}/block)
+ */
+export const blockUserController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const currentUserId = req.userId; 
+        const targetUserId = req.params.userId; 
+        if (!currentUserId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+        const result = await blockUser(currentUserId, targetUserId);
+        return res.status(200).json({
+            status: 'success',
+            message: 'User blocked successfully.',
+            ...result,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * API: Unblock User (DELETE /users/{userId}/block)
+ */
+export const unblockUserController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const currentUserId = req.userId; 
+        const targetUserId = req.params.userId; 
+        if (!currentUserId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+        const result = await unblockUser(currentUserId, targetUserId);
+        return res.status(200).json({
+            status: 'success',
+            message: 'User unblocked successfully.',
+            ...result,
+        });
     } catch (error) {
         next(error);
     }
