@@ -4,7 +4,19 @@ import * as crypto from 'crypto';
     //Prisma instances
 import prisma from '../utils/prisma';
 import { UserRole, BackofficeSettings } from '@prisma/client';
-import type {  User, SensitiveUserFields, PrivateUserFields, PublicUserProfile, NotificationType } from '../types';
+import type {  User, 
+             SensitiveUserFields, 
+             PrivateUserFields, 
+             PublicUserProfile, 
+             NotificationType, 
+             UpdateBankAccountPayload, 
+             LoginCredentials, 
+             LoginResponse,
+             SignUpCredentials,
+             SignUpResponse,
+             VerifyEmailByOtpCredentials,
+             ResetPasswordCredentials,
+            } from '../types';
   //Error handlers
 import { AuthenticationError } from '../errors/AuthenticationError'; 
 import { BadRequestError } from '../errors/BadRequestError'; 
@@ -18,52 +30,6 @@ import { emitWebSocketEvent } from '../utils/ws.util';
 import { sendVerificationEmail } from '../utils/emailSender';
 
 
-
-interface UpdateBankAccountPayload {
-  password: string; // For re-authentication
-  accountName: string;
-  accountNumber: string;
-  bankName: string;
-  // Add other required BankAccount fields
-}
-
-// Define the shape of the login credentials
-interface LoginCredentials {
-  identifier: string;
-  password: string;
-  // Metadata fields for logging (often passed from the controller)
-  ip?: string;
-  userAgent?: string;
-}
-// Define the expected successful response type
-interface LoginResponse {
-  user: Omit<User, SensitiveUserFields>;
-  token: string;
-}
-
-// Define the shape of the signup credentials
-interface SignUpCredentials {
-  username: string;
-  email: string;
-  password: string;
-}
-// Define the expected successful response type
-interface SignUpResponse {
-    user: Omit<User, SensitiveUserFields>; 
-    token: string;
-}
-// Define the shape of the verifyEmail credentials
-interface VerifyEmailByOtpCredentials {
-  userId: string;
-  otp: string;
-}
-
-// Define the shape of the ResetPassword credentials
-interface ResetPasswordCredentials {
-  email: string;
-  otp: string;
-  newPassword: string;
-}
 
 // --- Internal Helpers ---
 
