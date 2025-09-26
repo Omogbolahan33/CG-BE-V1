@@ -14,7 +14,7 @@ import { loginUser,
         updateUserSettings, 
         updateUserBankAccount, 
         requestFollow, 
-        cancelFollowRequest, acceptFollowRequest } from '../../../../src/services/auth.service';
+        cancelFollowRequest, acceptFollowRequest, declineFollowRequest } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -469,6 +469,34 @@ export const acceptFollowRequestController = async (req: AuthenticatedRequest, r
         return res.status(200).json({
             status: 'success',
             message: 'Follow request accepted.',
+            ...result,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Decline Follow Request (POST /users/follow-requests/{requesterId}/decline)
+ * @description Handles the request to decline a follow request.
+ */
+export const declineFollowRequestController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const currentUserId = req.userId; // The user declining (the target)
+        const requesterId = req.params.requesterId; // The user who sent the request (the follower)
+
+        if (!currentUserId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+
+        const result = await declineFollowRequest(currentUserId, requesterId);
+        
+        return res.status(200).json({
+            status: 'success',
+            message: 'Follow request declined.',
             ...result,
         });
 
