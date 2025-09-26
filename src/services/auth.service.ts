@@ -1501,7 +1501,7 @@ export const addReview = async (
         const existingReview = await prisma.review.findFirst({
             where: {
                 reviewerId: currentUserId,
-                reviewedUserId: targetUserId,
+                userId: targetUserId,
                 transactionId: transactionId,
             }
         });
@@ -1543,7 +1543,7 @@ export const addReview = async (
             rating: rating,
             comment: comment,
             reviewerId: currentUserId,
-            reviewedUserId: targetUserId,
+            UserId: targetUserId,
             transactionId: transactionId,
             isVerifiedPurchase: isVerifiedPurchase,
         }
