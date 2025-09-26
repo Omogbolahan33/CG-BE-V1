@@ -1038,7 +1038,11 @@ export const requestFollow = async (currentUserId: string, targetUserId: string)
         // Fetch current user's role and blocked list
         prisma.user.findUnique({
             where: { id: currentUserId },
-            select: { id: true, role: true, username: true, blockedUsers: { select: { id: true } }
+            select: { id: true, 
+                     role: true, 
+                     username: true, 
+                     blockedUsers: { select: { id: true } } 
+                    }
         }),
         // Fetch target user's follower info and blocked list
         prisma.user.findUnique({
