@@ -16,12 +16,15 @@ import { loginUser,
         requestFollow, 
         cancelFollowRequest, 
         acceptFollowRequest, 
-        declineFollowRequest, unfollowUser, blockUser, unblockUser} from '../../../../src/services/auth.service';
+        declineFollowRequest, 
+        unfollowUser, 
+        blockUser, 
+        unblockUser, addReview } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
 import { BadRequestError } from '../../../errors/BadRequestError';
-import type { User, UpdateBankAccountPayload  } from '../../../types';
+import type { User, UpdateBankAccountPayload, AddReviewPayload } from '../../../types';
 import { emitWebSocketEvent } from '../../../utils/ws.util'; 
 
 
@@ -574,6 +577,41 @@ export const unblockUserController = async (req: AuthenticatedRequest, res: Resp
             message: 'User unblocked successfully.',
             ...result,
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Add Review (POST /users/{userId}/reviews)
+ * @description Handles the submission of a user review.
+ */
+export const addReviewController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const currentUserId = req.userId; // The user submitting the review
+        const targetUserId = req.params.userId; // The user being reviewed
+        const payload: AddReviewPayload = req.body;
+
+        if (!currentUserId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+        
+        // Basic payload validation
+        if (typeof payload.rating !== 'number' || payload.rating < 1 || payload.rating > 5) {
+            throw new BadRequestError('Rating must be a number between 1 and 5.', 400);
+        }
+
+        // @response: Returns the newly created Review object
+        const newReview = await addReview(currentUserId, targetUserId, payload);
+        
+        return res.status(201).json({
+            status: 'success',
+            message: 'Review submitted successfully.',
+            data: newReview,
+        });
+
     } catch (error) {
         next(error);
     }
