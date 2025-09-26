@@ -1221,7 +1221,7 @@ export const acceptFollowRequest = async (currentUserId: string, requesterId: st
                 userId: requesterId,      // User receiving the notification (the new follower)
                 actorId: currentUserId,    // User who accepted the request
                 type: 'follow' as NotificationType, 
-                content: `${pendingRequest.username || 'A user'} is now following you!`,
+                content: `${requester.username} is now following you!`, 
                 link: `/profile/${currentUserId}`, // Link back to the acceptor's profile
             }
         });
