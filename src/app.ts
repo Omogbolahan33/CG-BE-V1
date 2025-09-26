@@ -19,7 +19,7 @@ const app: Application = express();
 const allowedOrigins = [
     'http://localhost:3000', 
     'https://aistudio.google.com', 
-    'https://312qu1ctk5s4het1q5lq4az16rwm72f6rt7w58bc5gukxjc393-h810427903.scf.usercontent.goog',
+    'https://3zfyz83n1sf0viudf1hnfb5khgqw9sgmkc4iphndpq9xnzge06-h810427903.scf.usercontent.goog'',
     'https://web.postman.co',
      undefined                         
 ];
