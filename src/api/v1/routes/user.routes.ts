@@ -11,7 +11,9 @@ import { getCurrentUserController,
         declineFollowRequestController, 
         unfollowUserController, 
         blockUserController, 
-        unblockUserController, addReviewController } from '../controllers/auth.controller'; 
+        unblockUserController, 
+        addReviewController, 
+        reportUserController } from '../controllers/auth.controller'; 
 
 const router = Router();
 
@@ -61,5 +63,10 @@ router.delete('/:userId/block', authMiddleware, unblockUserController);
 // Route for adding a review <-- NEW ROUTE
 // Endpoint: POST /api/v1/users/{userId}/reviews
 router.post('/:userId/reviews', authMiddleware, addReviewController);
+
+// Route for reporting a user <-- NEW ROUTE
+// Endpoint: POST /api/v1/users/report
+router.post('/report', authMiddleware, reportUserController); 
+
 
 export default router;
