@@ -1024,83 +1024,77 @@ export const updateUserBankAccount = async (userId: string, payload: UpdateBankA
 
 /**
  * API: Request Follow
- * @description Sends a follow request to another user, handling all pre-conditions.
+ * @description Sends a follow request to another user, handling all pre-conditions and side effects.
  * @param currentUserId The ID of the authenticated user (the follower).
  * @param targetUserId The ID of the user being followed.
  * @returns { success: boolean }
  */
 export const requestFollow = async (currentUserId: string, targetUserId: string): Promise<{ success: boolean }> => {
     
-    // --- 1. Pre-conditions Check & Data Fetch ---
-    
-    // Fetch all necessary data in one transaction/query batch for efficiency
-    const [currentUser, targetUser, settings] = await prisma.$transaction([
-        // Fetch current user's role and blocked list
+    // --- 1. Data Fetch & Pre-conditions Check ---
+
+    // Fetch all necessary data: target user's relations, current user's role, and Backoffice settings.
+    const [currentUserCheck, targetUserCheck, settings] = await prisma.$transaction([
+        // Current User: Role, and WHO they have blocked
         prisma.user.findUnique({
             where: { id: currentUserId },
-            select: { id: true, 
-                     role: true, 
-                     username: true, 
-                     blockedUsers: { select: { id: true } } 
-                    }
+            select: { 
+                id: true, 
+                role: true, 
+                username: true, 
+                blockedUsers: { select: { id: true } }, // Block Check 1
+                following: { where: { id: targetUserId }, select: { id: true } }, // Following Check
+                pendingFollowing: { where: { id: targetUserId }, select: { id: true } } // Pending Check (if using pendingFollowing instead of pendingFollowerIds)
+            }
         }),
-        // Fetch target user's follower info and blocked list
+        // Target User: WHO has blocked them, and WHO is currently requesting to follow them
         prisma.user.findUnique({
             where: { id: targetUserId },
             select: { 
-                followedBy: { select: { id: true } }, // Select IDs for checking
-                pendingFollowerIds: true, 
-                blockedBy: { select: { id: true } } // WHO has blocked the target user
+                blockedBy: { select: { id: true } }, // Block Check 2
+                pendingFollowers: { where: { id: currentUserId }, select: { id: true } } // Pending Check
             }
         }),
-        // Fetch Backoffice settings (assuming only one settings record exists)
-        prisma.backofficeSettings.findFirst({
-            where: { id: { not: undefined } } // Find the single settings record
-        })
+        // Backoffice Settings: Assuming only one settings record exists
+        prisma.backofficeSettings.findFirst({})
     ]);
 
-    if (!currentUser) {
-        throw new NotFoundError("Current user not found.", 404);
-    }
-    if (!targetUser) {
-        throw new NotFoundError(`User with ID ${targetUserId} not found.`, 404);
+    if (!currentUserCheck || !targetUserCheck) {
+        throw new NotFoundError("User not found.", 404);
     }
     if (!settings) {
-        // Essential configuration missing
-        throw new ForbiddenError("System configuration error. Cannot process request.", 403);
+        throw new ForbiddenError("System configuration error. Following is disabled.", 403);
     }
+
+    const targetUser = targetUserCheck; // Rename for clarity
+    const currentUser = currentUserCheck; 
 
     // 1.1 Current user cannot follow themselves.
     if (currentUserId === targetUserId) {
         throw new BadRequestError("You cannot follow yourself.", 400);
     }
     
-    // 1.2 Backoffice setting check (Authorization/Forbidden)
+    // 1.2 Backoffice setting check
     if (currentUser.role === 'Member' && !settings.enableFollowing) {
         throw new ForbiddenError("Following feature is currently disabled.", 403);
     }
     
-    // 1.3 Current user must not already be following the target user.
-    const isAlreadyFollowing = targetUser.followedBy.some(f => f.id === currentUserId);
-    if (isAlreadyFollowing) {
+    // 1.3 Current user must not already be following the target user. (Check 'following' relation)
+    if (currentUser.following.length > 0) {
         throw new BadRequestError("You are already following this user.", 400);
     }
 
     // 1.4 A follow request must not already be pending.
-    if (targetUser.pendingFollowerIds.includes(currentUserId)) {
+    // Check 1: Has the current user already sent a request? (via pendingFollowing)
+    // Check 2: Has the target user already received a request from the current user? (via pendingFollowers)
+    if (currentUser.pendingFollowing.length > 0 || targetUser.pendingFollowers.length > 0) {
         throw new BadRequestError("A follow request is already pending.", 400);
     }
     
-
-    // 1.5 Neither user can have blocked the other.
+    // 1.5 Neither user can have blocked the other. (Relational Check)
+    const isTargetBlockedByCurrent = currentUser.blockedUsers.length > 0;
+    const isCurrentBlockedByTarget = targetUser.blockedBy.length > 0;
     
-    // Check 1: Has the current user blocked the target user?
-    const isTargetBlockedByCurrent = currentUser.blockedUsers.some(blocked => blocked.id === targetUserId);
-    
-    // Check 2: Has the target user blocked the current user?
-    // We check the target user's 'blockedBy' list to see if the current user's ID is present.
-    const isCurrentBlockedByTarget = targetUser.blockedBy.some(blocker => blocker.id === currentUserId);
-     
     if (isTargetBlockedByCurrent || isCurrentBlockedByTarget) {
         throw new ForbiddenError("You cannot follow this user due to a block.", 403);
     }
@@ -1108,31 +1102,29 @@ export const requestFollow = async (currentUserId: string, targetUserId: string)
     // --- 2. Core Logic & Side Effects (Atomic Transaction) ---
 
     await prisma.$transaction(async (tx) => {
-        // 2.1 Core Logic: Atomically add currentUserId to the target user's pending list
+        // 2.1 Core Logic: Atomically add the current user to the target user's PENDING FOLLOWERS list.
+        // Prisma update syntax for M:N relations: connect the follower (current user) to the pendingFollowing list of the target.
         await tx.user.update({
             where: { id: targetUserId },
             data: {
-                pendingFollowers: { push: currentUserId },
-            }
+                pendingFollowers: {
+                    connect: { id: currentUserId },
+                },
+            },
         });
 
-        // 2.2 Side Effect: Create Notification (CORRECTED TYPE USAGE)
-        const notification: Notification = await tx.notification.create({
+        // 2.2 Side Effect: Create Notification
+        const notification = await tx.notification.create({
             data: {
                 userId: targetUserId,      // User receiving the notification
-                actorId: currentUserId,    // User who performed the action
-                
-                // CORRECTED: Using the enum value directly
+                actorId: currentUserId,    // User who sent the request
                 type: 'follow_request' as NotificationType, 
-                
                 content: `${currentUser.username} wants to follow you.`,
-                link: `/profile/${currentUser.id}/requests`, // Link to where follow requests are managed
+                link: `/profile/${currentUser.id}/requests`, 
             }
         });
 
         // 2.3 Realtime Event (Outside of DB transaction for non-blocking IO)
-        // We ensure the transaction completes before emitting the event.
-        // NOTE: We pass the created Notification object itself in the payload.
         emitWebSocketEvent(`user:${targetUserId}`, { type: 'newNotification', data: notification });
     });
 
