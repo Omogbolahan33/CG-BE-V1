@@ -1591,8 +1591,13 @@ export const reportUser = async (currentUserId: string, reportData: ReportUserPa
             reportedUserId: reportedUserId,         // 2. Link the reported user
             reason: reason,
             details: details,
-            attachmentUrl: attachmentUrl,           // 3. Store the URL
             status: 'Open' as UserReportStatus,     // 1. Set status to 'Open'
+            // CORRECTION: 
+            attachment: attachmentUrl 
+                ? { url: attachmentUrl, filename: 'report_attachment' } // Map attachmentUrl string to the 'attachment' Json field, Store as JSON object
+                : undefined, // Or null, if preferred. undefined tells Prisma to omit the field.
+            
+            // Note: The rest of the fields (resolvedBy, etc.) are optional/defaulted.
         }
     });
 
