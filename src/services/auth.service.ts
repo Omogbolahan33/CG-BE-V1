@@ -964,7 +964,7 @@ export const updateUserBankAccount = async (userId: string, payload: UpdateBankA
     // 3. Upsert/Update BankAccount (Transactional)
     const updatedUser = await prisma.$transaction(async (tx) => {
         // Check if a bank account already exists for this user
-        const existingBankAccount = await tx.bankAccounts.findFirst({
+        const existingBankAccount = await tx.bankAccount.findFirst({
             where: { userId: user.id },
         });
 
@@ -978,13 +978,13 @@ export const updateUserBankAccount = async (userId: string, payload: UpdateBankA
 
         if (existingBankAccount) {
             // Update the existing record
-            await tx.bankAccounts.update({
+            await tx.bankAccount.update({
                 where: { id: existingBankAccount.id },
                 data: bankAccountData,
             });
         } else {
             // Create a new record and link it to the user
-            await tx.bankAccounts.create({
+            await tx.bankAccount.create({
                 data: {
                     ...bankAccountData,
                     userId: user.id,
