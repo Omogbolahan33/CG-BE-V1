@@ -1,7 +1,19 @@
 // src/api/v1/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction  } from 'express';
-import { loginUser, logFailedLogin, signUp, verifyEmailByOtp, resendVerificationOtp, requestPasswordReset, resetPassword, signOut, getCurrentUser, getUserProfile, updateUserSettings, updateUserBankAccount, requestFollow } from '../../../../src/services/auth.service';
+import { loginUser, 
+        logFailedLogin, 
+        signUp, 
+        verifyEmailByOtp, 
+        resendVerificationOtp, 
+        requestPasswordReset, 
+        resetPassword, 
+        signOut, 
+        getCurrentUser, 
+        getUserProfile, 
+        updateUserSettings, 
+        updateUserBankAccount, 
+        requestFollow, cancelFollowRequest } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -400,6 +412,34 @@ export const requestFollowController = async (req: AuthenticatedRequest, res: Re
         return res.status(200).json({
             status: 'success',
             message: 'Follow request sent.',
+            ...result,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Cancel Follow Request (DELETE /users/{userId}/follow-request)
+ * @description Handles the request to cancel a previously sent follow request.
+ */
+export const cancelFollowRequestController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const currentUserId = req.userId; // The follower
+        const targetUserId = req.params.userId; // The user who received the request
+
+        if (!currentUserId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+
+        const result = await cancelFollowRequest(currentUserId, targetUserId);
+        
+        return res.status(200).json({
+            status: 'success',
+            message: 'Follow request cancelled.',
             ...result,
         });
 
