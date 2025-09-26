@@ -1236,3 +1236,52 @@ export const acceptFollowRequest = async (currentUserId: string, requesterId: st
 
     return { success: true };
 };
+
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+
+/**
+ * API: Decline Follow Request
+ * @description Declines a pending follow request from a requester.
+ * @param currentUserId The ID of the user declining the request (the target).
+ * @param requesterId The ID of the user who sent the request (the follower).
+ * @returns { success: boolean }
+ */
+export const declineFollowRequest = async (currentUserId: string, requesterId: string): Promise<{ success: boolean }> => {
+    
+    // 1. Pre-check: Ensure the requester exists.
+    const requester = await prisma.user.findUnique({
+        where: { id: requesterId },
+        select: { id: true }
+    });
+
+    if (!requester) {
+        // We use 404 here, but 400 Bad Request could also be justified if the request ID is just invalid.
+        throw new NotFoundError(`Requester with ID ${requesterId} not found.`, 404);
+    }
+
+    // 2. Core Logic: Atomically disconnect the requester from the current user's PENDING FOLLOWERS list.
+    // NOTE: If the request doesn't exist (i.e., it was already accepted or deleted), 
+    // Prisma's 'disconnect' performs a safe no-op. No explicit check for existence is needed.
+    try {
+        await prisma.user.update({
+            where: { id: currentUserId },
+            data: {
+                pendingFollowers: {
+                    disconnect: { id: requesterId },
+                },
+            },
+        });
+    } catch (error) {
+        // Log database-level errors
+        console.error("Prisma update failed during follow request decline:", error);
+        throw new Error("Failed to decline follow request due to a database error.");
+    }
+    
+    // 3. Side Effects: None, as per business logic.
+
+    return { success: true };
+};
