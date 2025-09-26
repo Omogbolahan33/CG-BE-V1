@@ -103,3 +103,12 @@ export interface AddReviewPayload {
     comment: string;
     transactionId?: string;
 }
+
+export interface ReportUserPayload {
+    reportedUserId: string;
+    reason: string;
+    details: string;
+    attachmentUrl?: string; // Changed from File to URL string for API consistency
+}
+
+export type UserReportStatus = 'Open' | 'UnderReview' | 'Closed'; 
