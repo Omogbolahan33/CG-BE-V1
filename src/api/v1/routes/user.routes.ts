@@ -8,7 +8,10 @@ import { getCurrentUserController,
         requestFollowController,
         cancelFollowRequestController, 
         acceptFollowRequestController, 
-        declineFollowRequestController, unfollowUserController } from '../controllers/auth.controller'; 
+        declineFollowRequestController, 
+        unfollowUserController, 
+        blockUserController, 
+        unblockUserController } from '../controllers/auth.controller'; 
 
 const router = Router();
 
@@ -46,5 +49,13 @@ router.post('/follow-requests/:requesterId/decline', authMiddleware, declineFoll
 // Route for to unfollow a user
 // Endpoint: /api/v1/users/{userId}/follow
 router.delete('/:userId/follow', authMiddleware, unfollowUserController); // DELETE is for unfollowing/removing the relationship <-- UPDATED ROUTE
+
+// Endpoint: /api/v1/users/{userId}/block
+// POST is for blocking, DELETE is for unblocking
+router.post('/:userId/block', authMiddleware, blockUserController);
+
+// Endpoint: /api/v1/users/{userId}/block
+// POST is for unblocking, DELETE is for unblocking
+router.delete('/:userId/block', authMiddleware, unblockUserController);
 
 export default router;
