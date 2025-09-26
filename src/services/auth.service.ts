@@ -1338,3 +1338,124 @@ export const unfollowUser = async (currentUserId: string, targetUserId: string):
 
     return { success: true };
 };
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+/**
+ * API: Block User
+ * @description Blocks a target user, atomically removing all existing social relationships.
+ * @param currentUserId The ID of the user performing the block.
+ * @param targetUserId The ID of the user being blocked.
+ * @returns { success: boolean }
+ */
+export const blockUser = async (currentUserId: string, targetUserId: string): Promise<{ success: boolean }> => {
+    
+    // Pre-conditions: Current user cannot block themselves.
+    if (currentUserId === targetUserId) {
+        throw new BadRequestError("You cannot block yourself.", 400);
+    }
+    
+    // Pre-check: Ensure the target user exists
+    const targetUser = await prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true }
+    });
+
+    if (!targetUser) {
+        throw new NotFoundError(`User with ID ${targetUserId} not found.`, 404);
+    }
+
+    // @transactional: Core Logic is atomic.
+    await prisma.$transaction([
+        // 1. Core Logic: Add userId to the current user's blockedUsers (Connect block relationship).
+        // (Prisma relational update handles the "prevent duplicates" requirement implicitly).
+        prisma.user.update({
+            where: { id: currentUserId },
+            data: {
+                blockedUsers: {
+                    connect: { id: targetUserId },
+                },
+            },
+        }),
+
+        // 2. Remove userId from the current user's followingIds (Disconnect current user's 'following' relation)
+        prisma.user.update({
+            where: { id: currentUserId },
+            data: {
+                following: {
+                    disconnect: { id: targetUserId },
+                },
+            },
+        }),
+        
+        // 3. Remove the current user's ID from the userId's followingIds (Disconnect target user's 'followers' relation)
+        prisma.user.update({
+            where: { id: targetUserId },
+            data: {
+                followers: {
+                    disconnect: { id: currentUserId },
+                },
+            },
+        }),
+
+        // 4. Remove any pending follow requests between the two users.
+        // Disconnect target from current user's 'pendingFollowing'
+        prisma.user.update({
+            where: { id: currentUserId },
+            data: {
+                pendingFollowing: {
+                    disconnect: { id: targetUserId },
+                },
+            },
+        }),
+        // Disconnect current user from target user's 'pendingFollowers'
+        prisma.user.update({
+            where: { id: targetUserId },
+            data: {
+                pendingFollowers: {
+                    disconnect: { id: currentUserId },
+                },
+            },
+        }),
+    ]);
+    
+    return { success: true };
+};
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+/**
+ * API: Unblock User
+ * @description Removes the block relationship between the current user and the target user.
+ * @param currentUserId The ID of the user performing the unblock.
+ * @param targetUserId The ID of the user being unblocked.
+ * @returns { success: boolean }
+ */
+export const unblockUser = async (currentUserId: string, targetUserId: string): Promise<{ success: boolean }> => {
+    
+    if (currentUserId === targetUserId) {
+        throw new BadRequestError("You cannot unblock yourself.", 400);
+    }
+    
+    const targetUser = await prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true }
+    });
+
+    if (!targetUser) {
+        throw new NotFoundError(`User with ID ${targetUserId} not found.`, 404);
+    }
+
+    // @coreLogic: Remove userId from the current user's blockedUserIds (Disconnect block relationship).
+    await prisma.user.update({
+        where: { id: currentUserId },
+        data: {
+            blockedUsers: {
+                disconnect: { id: targetUserId },
+            },
+        },
+    });
+
+    return { success: true };
+};
