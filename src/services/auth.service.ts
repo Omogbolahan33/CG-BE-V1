@@ -1148,3 +1148,91 @@ export const cancelFollowRequest = async (currentUserId: string, targetUserId: s
 
     return { success: true };
 };
+
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+
+/**
+ * API: Accept Follow Request
+ * @description Accepts a pending follow request from a requester.
+ * @param currentUserId The ID of the user accepting the request (the target).
+ * @param requesterId The ID of the user who sent the request (the follower).
+ * @returns { success: boolean }
+ */
+export const acceptFollowRequest = async (currentUserId: string, requesterId: string): Promise<{ success: boolean }> => {
+    
+    // 1. Pre-check: Ensure the requester exists and is in the current user's pending list.
+    const requester = await prisma.user.findUnique({
+        where: { id: requesterId },
+        select: { id: true, username: true }
+    });
+
+    if (!requester) {
+        throw new NotFoundError(`Requester with ID ${requesterId} not found.`, 404);
+    }
+    
+    // We must check if the request is actually pending. We query the target's (current user's)
+    // pendingFollowers relationship for the requester's ID.
+    const pendingRequest = await prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: { 
+            pendingFollowers: { 
+                where: { id: requesterId }, 
+                select: { id: true } 
+            } 
+        }
+    });
+
+    if (!pendingRequest || pendingRequest.pendingFollowers.length === 0) {
+        // This means the request was already accepted, denied, or never sent.
+        throw new NotFoundError("No pending follow request found from this user.", 404);
+    }
+
+    // 2. Core Logic: Atomic Transaction
+    const [updatedTargetUser, notification] = await prisma.$transaction(async (tx) => {
+        // 2.1 Remove requesterId from pendingFollowers (Disconnect pending relation)
+        await tx.user.update({
+            where: { id: currentUserId },
+            data: {
+                pendingFollowers: {
+                    disconnect: { id: requesterId },
+                },
+            },
+        });
+
+        // 2.2 Add requesterId to target's followers and target to requester's following (Connect active relation)
+        const updatedTarget = await tx.user.update({
+            where: { id: currentUserId },
+            data: {
+                // Connect the requester (follower) to the target's 'followers' relation.
+                followers: {
+                    connect: { id: requesterId },
+                },
+            },
+            select: { id: true } // Select minimal data
+        });
+
+        // 2.3 Side Effect: Create 'follow' Notification
+        const notificationRecord = await tx.notification.create({
+            data: {
+                userId: requesterId,      // User receiving the notification (the new follower)
+                actorId: currentUserId,    // User who accepted the request
+                type: 'follow' as NotificationType, 
+                content: `${pendingRequest.username || 'A user'} is now following you!`,
+                link: `/profile/${currentUserId}`, // Link back to the acceptor's profile
+            }
+        });
+
+        return [updatedTarget, notificationRecord];
+    });
+
+
+    // 3. Realtime Side Effect
+    // Emit the notification object to the requester's channel
+    emitWebSocketEvent(`user:${requesterId}`, { type: 'newNotification', data: notification });
+
+    return { success: true };
+};
