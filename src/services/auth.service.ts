@@ -1543,7 +1543,7 @@ export const addReview = async (
             rating: rating,
             comment: comment,
             reviewerId: currentUserId,
-            UserId: targetUserId,
+            userId: targetUserId,
             transactionId: transactionId,
             isVerifiedPurchase: isVerifiedPurchase,
         }
