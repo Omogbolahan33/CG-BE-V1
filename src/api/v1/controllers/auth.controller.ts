@@ -14,7 +14,9 @@ import { loginUser,
         updateUserSettings, 
         updateUserBankAccount, 
         requestFollow, 
-        cancelFollowRequest, acceptFollowRequest, declineFollowRequest } from '../../../../src/services/auth.service';
+        cancelFollowRequest, 
+        acceptFollowRequest, 
+        declineFollowRequest, unfollowUser } from '../../../../src/services/auth.service';
 import { UserRole } from '@prisma/client';
 import { AuthenticationError } from '../../../errors/AuthenticationError';
 import { AuthenticatedRequest } from '../../../middlewares/auth.middleware';
@@ -497,6 +499,34 @@ export const declineFollowRequestController = async (req: AuthenticatedRequest, 
         return res.status(200).json({
             status: 'success',
             message: 'Follow request declined.',
+            ...result,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Unfollow User (DELETE /users/{userId}/follow)
+ * @description Handles the request to unfollow a user.
+ */
+export const unfollowUserController = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const currentUserId = req.userId; // The user performing the action
+        const targetUserId = req.params.userId; // The user being unfollowed
+
+        if (!currentUserId) {
+            throw new AuthenticationError('Authentication required.', 401);
+        }
+
+        const result = await unfollowUser(currentUserId, targetUserId);
+        
+        return res.status(200).json({
+            status: 'success',
+            message: 'User unfollowed.',
             ...result,
         });
 
