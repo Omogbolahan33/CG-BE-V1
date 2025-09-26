@@ -15,8 +15,10 @@ import type {  User,
              SignUpCredentials,
              SignUpResponse,
              VerifyEmailByOtpCredentials,
-             ResetPasswordCredentials,
-            } from '../types';
+             ResetPasswordCredentials, 
+             Review, 
+             Transaction, 
+             AddReviewPayload} from '../types';
   //Error handlers
 import { AuthenticationError } from '../errors/AuthenticationError'; 
 import { BadRequestError } from '../errors/BadRequestError'; 
@@ -1458,4 +1460,94 @@ export const unblockUser = async (currentUserId: string, targetUserId: string): 
     });
 
     return { success: true };
+};
+
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+/**
+ * API: Add Review
+ * @description Submits a review for another user, with optional transaction verification.
+ * @param currentUserId The ID of the authenticated user submitting the review.
+ * @param targetUserId The ID of the user being reviewed.
+ * @param reviewData The review content (rating, comment, transactionId).
+ * @returns { Review } The newly created Review object.
+ */
+export const addReview = async (
+    currentUserId: string, 
+    targetUserId: string, 
+    reviewData: AddReviewPayload
+): Promise<Review> => {
+
+    const { rating, comment, transactionId } = reviewData;
+
+    // @businessLogic: Pre-conditions: A user cannot review themselves.
+    if (currentUserId === targetUserId) {
+        throw new BadRequestError("You cannot review yourself.", 400);
+    }
+    
+    // Check if the target user exists
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser) {
+        throw new NotFoundError("User being reviewed not found.", 404);
+    }
+
+    let isVerifiedPurchase = false;
+
+    if (transactionId) {
+        // @businessLogic: Check for duplicate review by transaction
+        const existingReview = await prisma.review.findFirst({
+            where: {
+                reviewerId: currentUserId,
+                reviewedUserId: targetUserId,
+                transactionId: transactionId,
+            }
+        });
+
+        // @errorHandling: 409 Conflict
+        if (existingReview) {
+            throw new ConflictError("A review for this transaction by you already exists.", 409);
+        }
+
+        // @coreLogic: Validate transaction details
+        const transaction = await prisma.transaction.findUnique({
+            where: { id: transactionId }
+        });
+
+        if (!transaction) {
+             throw new NotFoundError(`Transaction with ID ${transactionId} not found.`, 404);
+        }
+
+        // Validate the roles in the transaction
+        const isReviewerBuyer = transaction.buyerId === currentUserId;
+        const isReviewedSeller = transaction.sellerId === targetUserId;
+
+        // @errorHandling: 403 Forbidden
+        if (!isReviewerBuyer || !isReviewedSeller) {
+            throw new ForbiddenError(
+                "You can only review the seller if you were the buyer in this transaction.", 
+                403
+            );
+        }
+
+        // If all checks pass, mark as verified
+        isVerifiedPurchase = true;
+    }
+
+
+    // @coreLogic: Create a new Review record.
+    const newReview = await prisma.review.create({
+        data: {
+            rating: rating,
+            comment: comment,
+            reviewerId: currentUserId,
+            reviewedUserId: targetUserId,
+            transactionId: transactionId,
+            isVerifiedPurchase: isVerifiedPurchase,
+        }
+    });
+
+    return newReview;
 };
