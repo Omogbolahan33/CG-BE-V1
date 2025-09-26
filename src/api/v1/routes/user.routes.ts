@@ -11,7 +11,7 @@ import { getCurrentUserController,
         declineFollowRequestController, 
         unfollowUserController, 
         blockUserController, 
-        unblockUserController } from '../controllers/auth.controller'; 
+        unblockUserController, addReviewController } from '../controllers/auth.controller'; 
 
 const router = Router();
 
@@ -57,5 +57,9 @@ router.post('/:userId/block', authMiddleware, blockUserController);
 // Endpoint: /api/v1/users/{userId}/block
 // POST is for unblocking, DELETE is for unblocking
 router.delete('/:userId/block', authMiddleware, unblockUserController);
+
+// Route for adding a review <-- NEW ROUTE
+// Endpoint: POST /api/v1/users/{userId}/reviews
+router.post('/:userId/reviews', authMiddleware, addReviewController);
 
 export default router;
