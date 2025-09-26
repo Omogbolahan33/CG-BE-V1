@@ -1097,3 +1097,54 @@ export const requestFollow = async (currentUserId: string, targetUserId: string)
 
     return { success: true };
 };
+
+
+
+
+
+// ----------------------------------- Main Service Logic ------------------------------------------------------------------
+
+
+/**
+ * API: Cancel Follow Request
+ * @description Cancels a follow request sent by the current user to the target user.
+ * @param currentUserId The ID of the authenticated user (the one who sent the request).
+ * @param targetUserId The ID of the user who received the request.
+ * @returns { success: boolean }
+ */
+export const cancelFollowRequest = async (currentUserId: string, targetUserId: string): Promise<{ success: boolean }> => {
+    
+    // 1. Pre-check: Ensure the target user exists
+    const targetUser = await prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true }
+    });
+
+    if (!targetUser) {
+        throw new NotFoundError(`User with ID ${targetUserId} not found.`, 404);
+    }
+
+    // 2. Core Logic: Atomically disconnect the follower from the target user's PENDING FOLLOWERS list.
+    // This action implicitly checks if the request exists. If it doesn't exist, Prisma performs a no-op (no error).
+    try {
+        await prisma.user.update({
+            where: { id: targetUserId },
+            data: {
+                pendingFollowers: {
+                    // Disconnect the current user (follower) from the pendingFollowers relation of the target.
+                    disconnect: { id: currentUserId },
+                },
+            },
+        });
+    } catch (error) {
+        // If the update fails for a reason other than not found (which is checked above), 
+        // log or handle the error. For a disconnect operation, a general failure here 
+        // is rare if the IDs are valid.
+        console.error("Prisma update failed during follow request cancellation:", error);
+        throw new Error("Failed to cancel follow request due to a database error.");
+    }
+    
+    // Note: No side effects (like sending a notification) are typically needed for a cancellation.
+
+    return { success: true };
+};
