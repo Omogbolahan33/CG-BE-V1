@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
     //Prisma instances
 import prisma from '../utils/prisma';
 import { UserRole, BackofficeSettings } from '@prisma/client';
+import type { $Enums } from '@prisma/client'; 
 import type {  User, 
              SensitiveUserFields, 
              PrivateUserFields, 
@@ -18,7 +19,8 @@ import type {  User,
              ResetPasswordCredentials, 
              Review, 
              Transaction, 
-             AddReviewPayload, ReportUserPayload,UserReportStatus } from '../types';
+             AddReviewPayload, ReportUserPayload } from '../types';
+
   //Error handlers
 import { AuthenticationError } from '../errors/AuthenticationError'; 
 import { BadRequestError } from '../errors/BadRequestError'; 
@@ -1591,7 +1593,7 @@ export const reportUser = async (currentUserId: string, reportData: ReportUserPa
             reportedUserId: reportedUserId,         // 2. Link the reported user
             reason: reason,
             details: details,
-            status: 'Open' as UserReportStatus,     // 1. Set status to 'Open'
+            status: 'Open' as $Enums.UserReportStatus,     // 1. Set status to 'Open'
             // CORRECTION: 
             attachment: attachmentUrl 
                 ? { url: attachmentUrl, filename: 'report_attachment' } // Map attachmentUrl string to the 'attachment' Json field, Store as JSON object
