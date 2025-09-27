@@ -21,6 +21,15 @@ export type Comment = PrismaComment;
 
 // --- Define Custom Types for API Responses/Requests ---
 
+
+// The definitive type for the authenticated user context
+export interface AuthUser {
+    id: string;
+    role: string; 
+    isBanned: boolean; 
+    hasBankAccount: boolean; 
+}
+
 // Define the fields that are always sensitive and MUST be omitted from public responses.
 export type SensitiveUserFields = 
     | 'password' 
