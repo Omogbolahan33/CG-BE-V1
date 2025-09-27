@@ -1,5 +1,3 @@
-// src/services/post.service.ts
-
 import prisma from '../utils/prisma';
 import { Prisma, UserRole } from '@prisma/client';
 import { calculateTrendingScore } from '../utils/score.util';
@@ -788,4 +786,48 @@ export const followPost = async (
     const updatedFollowedPostIds = updatedUser.followedPosts.map(p => p.id);
     
     return { followedPostIds: updatedFollowedPostIds };
+};
+
+
+
+
+
+
+/**
+ * Service: Flag Post
+ * @description Adds a flag to a post for moderator review.
+ * @coreLogic Connects the current user to the post's 'flaggedBy' relation.
+ */
+export const flagPost = async (
+    postId: string, 
+    currentAuthUserId: string
+): Promise<{ success: boolean }> => {
+    
+    // 1. Check if the post exists
+    const postExists = await prisma.post.findUnique({
+        where: { id: postId },
+        select: { id: true }
+    });
+
+    if (!postExists) {
+        throw new NotFoundError('Post not found.');
+    }
+
+    // Define the User object for the connect operation
+    const userConnect = { id: currentAuthUserId };
+    
+    // 2. Core Logic: Atomically add the user's ID to the post's flaggedBy relation
+    // If the relationship already exists (user has flagged before), Prisma ignores the 'connect' command.
+    await prisma.post.update({
+        where: { id: postId },
+        data: {
+            flaggedBy: {
+                connect: userConnect // Adds the user ID to the flaggedBy relation
+            },
+            // Update last activity timestamp on flag (optional, but useful)
+            lastActivityTimestamp: new Date(), 
+        },
+    });
+
+    return { success: true };
 };
