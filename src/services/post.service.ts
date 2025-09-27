@@ -381,7 +381,7 @@ export const createPost = async (
     await prisma.activityLog.create({
         data: {
             userId: authorId,
-            type: 'POST_CREATED',
+            action: 'POST_CREATED',
             // 🔥 FIX: Stringify the object if ActivityLog.details is a String
             // If your schema uses 'Json', remove JSON.stringify().
             details: JSON.stringify({ postId: createdPost.id, title: createdPost.title }) 
