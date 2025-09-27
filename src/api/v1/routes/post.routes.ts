@@ -1,5 +1,8 @@
 import { Router } from 'express';
-import { getPostsController, getPostDetailsController,createPostController, updatePostController } from '../controllers/post.controller';
+import { getPostsController, 
+        getPostDetailsController,
+        createPostController, 
+        updatePostController, deletePostController } from '../controllers/post.controller';
 import { authMiddleware } from '../../../middlewares/auth.middleware';
 
 const router = Router();
@@ -18,5 +21,9 @@ router.post('/', authMiddleware, createPostController);
 // Endpoint: PUT /api/v1/posts/:postId
 // Authorization: Update POST Requires user to be logged in (via authMiddleware)
 router.put('/:postId', authMiddleware, updatePostController); 
+
+// Endpoint: DELETE /api/v1/posts/:postId
+// Authorization: User must be logged in
+router.delete('/:postId', authMiddleware, deletePostController); 
 
 export default router;
