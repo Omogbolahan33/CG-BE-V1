@@ -7,7 +7,14 @@ import IORedis from 'ioredis';
 const REDIS_CONNECTION = new IORedis({ 
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379'),
+    password: process.env.REDIS_PASSWORD
     maxRetriesPerRequest: null,
+    
+    // Required for the 'rediss://' protocol from Render
+    tls: {
+        rejectUnauthorized: false 
+    }, 
+    
 });
 
 const queueMap = new Map<string, Queue>();
