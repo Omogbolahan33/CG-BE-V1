@@ -25,7 +25,7 @@ const POST_SELECT_FIELDS = {
     brand: true,
     condition: true,
     deliveryOptions: true,
-    media: true
+    media: true,
     content: true,
     likesCount: true,
     commentsCount: true,
