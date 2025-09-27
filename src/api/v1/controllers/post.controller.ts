@@ -8,7 +8,8 @@ import { getPosts,
         deletePost, 
         likePost, 
         dislikePost, 
-        followPost,flagPost } from '../../../services/post.service'; 
+        followPost, 
+        flagPost, toggleSoldOutStatus } from '../../../services/post.service'; 
 import { ForbiddenError } from '../../../errors/ForbiddenError';
 
 /**
@@ -285,6 +286,32 @@ export const flagPostController = async (req: AuthRequest, res: Response, next: 
         // Success response
         // Note: The Swagger spec suggests 200 OK for 'Post flagged successfully.'
         return res.status(200).json(result); 
+
+    } catch (error: any) {
+        next(error);
+    }
+};
+
+
+
+
+// --- Toggle Sold Controller ---
+export const toggleSoldOutStatusController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const postId = req.params.postId;
+        const currentAuthUserId = req.userId; 
+        
+        if (!currentAuthUserId) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        const updatedPost = await toggleSoldOutStatus(postId, currentAuthUserId);
+
+        // Realtime: Emit post update event here
+        // io.emit(`postUpdate:${postId}`, updatedPost);
+
+        // Success response
+        return res.status(200).json(updatedPost);
 
     } catch (error: any) {
         next(error);
