@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getTransactions } from '../services/transaction.service';
+import { getTransactions } from '../../../services/transaction.service';
 import { UserRole } from '@prisma/client';
 
 // Custom interface for authenticated request
