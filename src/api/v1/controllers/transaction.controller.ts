@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getTransactions, createTransaction } from '../../../services/transaction.service';
+import { getTransactions, createTransaction, updateTransaction } from '../../../services/transaction.service';
 import { UserRole } from '@prisma/client';
 import { BadRequestError } from '../../../errors/BadRequestError';
 
@@ -59,6 +59,47 @@ export const createTransactionController = async (req: AuthRequest, res: Respons
 
         // Success response
         return res.status(201).json(newTransaction);
+
+    } catch (error: any) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * Controller: Update Transaction Status
+ */
+export const updateTransactionController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const transactionId = req.params.transactionId;
+        // status and trackingNumber come from the JSON body
+        const { status, trackingNumber } = req.body; 
+        // proofOfShipment comes from the file upload middleware (req.file or similar)
+        const proofOfShipment = req.file; 
+        
+        const currentAuthUserId = req.userId;
+        const currentUserRole = req.userRole;
+
+        if (!currentAuthUserId || !currentUserRole) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+        
+        // Pass only the fields that were actually provided in the request
+        const updates = { 
+            status: status, 
+            trackingNumber: trackingNumber, 
+            proofOfShipment: proofOfShipment 
+        };
+
+        const updatedTransaction = await updateTransaction(
+            transactionId, 
+            updates, 
+            currentAuthUserId,
+            currentUserRole
+        );
+
+        return res.status(200).json(updatedTransaction);
 
     } catch (error: any) {
         next(error);
