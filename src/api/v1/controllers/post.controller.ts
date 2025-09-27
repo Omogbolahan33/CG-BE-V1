@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { GetPostsFilters } from '../../../types';
-import { getPosts } from '../../../services/post.service'; 
+import { getPosts, getPostDetails } from '../../../services/post.service'; 
 
 /**
  * API: Get Posts
@@ -30,6 +30,33 @@ export const getPostsController = async (req: Request, res: Response, next: Next
             status: 'success',
             message: 'Posts fetched successfully.',
             data: { posts, total },
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Get Post Details
+ * @description Fetches a single post by ID with nested comments.
+ */
+export const getPostDetailsController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { postId } = req.params;
+
+        if (!postId) {
+            throw new Error('Post ID is required in the path parameters.');
+        }
+
+        const post = await getPostDetails(postId);
+
+        return res.status(200).json({
+            status: 'success',
+            message: 'Post details fetched successfully.',
+            data: post,
         });
 
     } catch (error) {
