@@ -199,3 +199,56 @@ export const editComment = async (
 
     return updatedComment;
 };
+
+
+
+/**
+ * API: Delete Comment
+ * @description Deletes a comment.
+ * @authorization User must be the author or an Admin/Super Admin.
+ */
+export const deleteComment = async (
+    postId: string, 
+    commentId: string,
+    currentAuthUserId: string,
+    currentUserRole: UserRole
+): Promise<{ success: boolean }> => {
+    
+    // 1. Fetch the comment and check existence
+    const commentToDelete = await prisma.comment.findUnique({ 
+        where: { id: commentId },
+        select: { 
+            id: true, 
+            authorId: true, 
+            postId: true, 
+        }
+    });
+
+    if (!commentToDelete) {
+        throw new NotFoundError('Comment not found.');
+    }
+
+    // Authorization: User must be the author OR an Admin/Super Admin.
+    const isAuthor = commentToDelete.authorId === currentAuthUserId;
+    const isAdmin = currentUserRole === UserRole.Admin || currentUserRole === UserRole.SuperAdmin;
+
+    if (!isAuthor && !isAdmin) {
+        throw new ForbiddenError('You do not have permission to delete this comment.');
+    }
+    
+    // Pre-condition: Comment must belong to the correct post (for path validation)
+    if (commentToDelete.postId !== postId) {
+        throw new NotFoundError('Comment does not belong to the specified post.');
+    }
+
+    // 2. Core Logic: Delete the Comment
+    // We rely on the database schema's onDelete: Cascade to handle:
+    // - Nested replies (children comments)
+    // - Any related notifications or activity logs
+    
+    await prisma.comment.delete({ 
+        where: { id: commentId },
+    });
+    
+    return { success: true };
+};
