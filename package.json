@@ -30,6 +30,7 @@
   "dependencies": {
     "@prisma/client": "^6.16.2",
     "@types/cookie-parser": "^1.4.9",
+    "@types/sanitize-html": "^2.16.0",
     "bcrypt": "^6.0.0",
     "cookie-parse": "^0.4.0",
     "cookie-parser": "^1.4.7",
