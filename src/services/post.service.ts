@@ -13,6 +13,7 @@ import { Post, GetPostsFilters } from '../types';
  */
 const POST_SELECT_FIELDS = {
     id: true,
+    title: true, 
     timestamp: true, 
     lastActivityTimestamp: true, 
     content: true,
