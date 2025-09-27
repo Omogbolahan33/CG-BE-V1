@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { addComment } from '../../../services/comment.service';
+import { addComment, editComment } from '../../../services/comment.service';
 import { AuthUser } from '../../../types'; 
 import { UserRole } from '@prisma/client';
-
 // Custom interface for authenticated request
 interface AuthRequest extends Request {
     userId?: string;
@@ -39,3 +38,33 @@ export const addCommentController = async (req: AuthRequest, res: Response, next
     }
 };
 
+
+
+export const editCommentController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { postId, commentId } = req.params;
+        // Body parameter is typically camelCase, but spec used 'newContent'
+        const { newContent } = req.body; 
+        const currentAuthUserId = req.userId; 
+
+        if (!currentAuthUserId) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        const updatedComment = await editComment(
+            postId, 
+            commentId, 
+            newContent,
+            currentAuthUserId
+        );
+
+        // Realtime: Emit comment update event
+        // io.emit(`commentUpdate:${postId}`, updatedComment);
+
+        // Success response
+        return res.status(200).json(updatedComment);
+
+    } catch (error: any) {
+        next(error);
+    }
+};
