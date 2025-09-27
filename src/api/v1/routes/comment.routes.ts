@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { authMiddleware } from '../../../middlewares/auth.middleware';
 import { addCommentController, 
         editCommentController, 
-        deleteCommentController, likeCommentController, dislikeCommentController } from '../controllers/comment.controller'; 
+        deleteCommentController, 
+        likeCommentController, 
+        dislikeCommentController, flagCommentController } from '../controllers/comment.controller'; 
 
 const router = Router({ mergeParams: true });
 
@@ -26,5 +28,9 @@ router.post('/:commentId/like', authMiddleware, likeCommentController);
 // DISLIKE COMMENT
 // Endpoint: POST /:postId/comments/:commentId/dislike
 router.post('/:commentId/dislike', authMiddleware, dislikeCommentController); 
+
+//  FLAG COMMENT
+// Endpoint: POST /:postId/comments/:commentId/flag
+router.post('/:commentId/flag', authMiddleware, flagCommentController); 
 
 export default router;
