@@ -709,45 +709,62 @@ export const dislikePost = async (
 };
 
 
-interface FollowResponse {
-    followedPostIds: string[];
-}
+
+
+
+
 
 /**
  * Service: Follow/Unfollow Post
  * @description Toggles following a specific post to receive notifications on new comments.
  * @coreLogic Atomically adds or removes the postId from the current user's followedPostIds array.
  */
+interface FollowResponse {
+    followedPostIds: string[];
+}
+
+
 export const followPost = async (
     postId: string, 
     currentAuthUserId: string
 ): Promise<FollowResponse> => {
     
+    // Define the Post object for connect/disconnect operations
+    const postConnect = { id: postId };
+
     // 1. Fetch the user's current followedPostIds to determine action
     const user = await prisma.user.findUnique({
         where: { id: currentAuthUserId },
-        select: { followedPostIds: true }
+        // Select the IDs from the 'followedPosts' relation
+        select: { 
+            followedPosts: { 
+                select: { id: true } 
+            } 
+        }
     });
 
     if (!user) {
         throw new NotFoundError('User not found.');
     }
 
-    const currentlyFollowing = user.followedPostIds.includes(postId);
+    // Determine current state
+    const followedPostIds = user.followedPosts.map(p => p.id);
+    const currentlyFollowing = followedPostIds.includes(postId);
+
     let updateData: Prisma.UserUpdateInput;
 
     if (currentlyFollowing) {
-        // Unfollow: Atomically remove the postId from the array (Prisma's pull)
+        // Unfollow: Atomically remove the Post from the relation
         updateData = {
-            followedPostIds: {
-                set: user.followedPostIds.filter(id => id !== postId)
+            followedPosts: {
+                disconnect: postConnect
             }
         };
     } else {
-        // Follow: Atomically add the postId to the array (Prisma's push)
+        // Follow: Atomically add the Post to the relation
         updateData = {
-            followedPostIds: {
-                push: postId
+            followedPosts: {
+                connect: postConnect
             }
         };
     }
@@ -756,13 +773,19 @@ export const followPost = async (
     const updatedUser = await prisma.user.update({
         where: { id: currentAuthUserId },
         data: updateData,
-        select: { followedPostIds: true }
+        // Select the IDs from the updated relation to return
+        select: { 
+            followedPosts: { 
+                select: { id: true } 
+            } 
+        }
     });
 
-    // 3. Side Effect (Realtime)
-    // On success, emit a `userUpdate:{userId}` event with the updated `followedPostIds`.
-    // (This step is typically handled in the controller or a service wrapper, 
-    // but the intention is noted.)
-
-    return { followedPostIds: updatedUser.followedPostIds };
+    // 3. Side Effect (Realtime) - A notification job is NOT required here,
+    //    as the notification for 'followed_post_comment' is triggered when a comment is created.
+    
+    // 4. Return the array of IDs
+    const updatedFollowedPostIds = updatedUser.followedPosts.map(p => p.id);
+    
+    return { followedPostIds: updatedFollowedPostIds };
 };
