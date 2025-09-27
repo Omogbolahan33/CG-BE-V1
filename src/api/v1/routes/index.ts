@@ -8,6 +8,7 @@ import authRoutes from './auth.route';
 import userRouter from './user.routes'; 
 import postRoutes from './post.routes';
 import commentRouter from './comment.routes';
+import transactionRouter from './routes/transaction.routes'; 
 
 const v1Router = Router();
 
@@ -21,11 +22,15 @@ v1Router.use('/auth', authRoutes);
 v1Router.use('/users', userRouter);
 
 // POST ROUTES
-// Mounts all routes from user.routes.ts under the path /api/v1/posts
+// Mounts all routes from post.routes.ts under the path /api/v1/posts
 v1Router.use('/posts', postRoutes);
 
 // COMMENT ROUTES
-// Mounts all routes from user.routes.ts under the path /api/v1/posts
+// Mounts all routes from comment.routes.ts under the path /api/v1/posts
 v1Router.use('/:postId/comments', commentRouter);
+
+// TRANSACTION ROUTES
+// Mounts all routes from transaction.routes.ts under the path /api/v1/posts
+v1Router.use('/api/transactions', transactionRouter); 
 
 export default v1Router;
