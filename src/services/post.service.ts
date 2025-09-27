@@ -1,7 +1,7 @@
 // src/services/post.service.ts
 
 import prisma from '../utils/prisma';
-import { Prisma } from '@prismaClient';
+import { Prisma } from '@prisma/client';
 import { calculateTrendingScore } from '../utils/score.util';
 import { sanitizePostContent } from '../utils/sanitize-html'; // <-- Correct, singular import of wrapper
 import { getBackofficeSettings } from '../utils/settings.util'; 
