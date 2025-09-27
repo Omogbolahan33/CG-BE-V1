@@ -1,7 +1,7 @@
 // src/services/post.service.ts
 
 import prisma from '../utils/prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { calculateTrendingScore } from '../utils/score.util';
 import { sanitizePostContent } from '../utils/sanitize-html'; // <-- Correct, singular import of wrapper
 import { getBackofficeSettings } from '../utils/settings.util'; 
@@ -493,4 +493,54 @@ export const updatePost = async (
     }) as unknown as Post; 
 
     return updatedPost;
+};
+
+
+
+/**
+ * Service: Delete Post
+ * @description Deletes an existing post.
+ * @authorization User must be the author or an Admin/Super Admin.
+ * @transactional Ensures the post is deleted and, via cascading, all related records.
+ */
+export const deletePost = async (
+    postId: string, 
+    currentAuthUserId: string,
+    currentUserRole: UserRole // Assuming the user's role is passed from the controller
+): Promise<{ success: boolean }> => {
+    
+    // 1. Fetch Post and Authorization Check
+    const postToDelete = await prisma.post.findUnique({ 
+        where: { id: postId },
+        select: { authorId: true } // Only need authorId for the check
+    });
+
+    if (!postToDelete) {
+        throw new NotFoundError('Post not found.');
+    }
+
+    // @authorization: User must be the author OR an Admin/Super Admin.
+    const isAuthor = postToDelete.authorId === currentAuthUserId;
+    const isAdmin = currentUserRole === UserRole.ADMIN || currentUserRole === UserRole.SUPER_ADMIN;
+
+    if (!isAuthor && !isAdmin) {
+        throw new ForbiddenError('You do not have permission to delete this post.');
+    }
+
+    // 2. Core Logic: Delete the Post (Cascading Deletion)
+    // We rely on the database schema's onDelete: Cascade to handle:
+    // - Comments
+    // - Notifications (or any other related records)
+    
+    // Use a transaction for safety, though a single delete operation is often enough
+    // if cascading is configured correctly. We use the single delete for simplicity
+    // and efficiency, assuming CASCADE is set.
+
+    await prisma.post.delete({ 
+        where: { id: postId },
+    });
+    
+    // Note: No need for explicit 'db.comment.deleteMany' if CASCADE is on.
+
+    return { success: true };
 };
