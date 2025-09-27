@@ -13,8 +13,8 @@ import { Post, GetPostsFilters } from '../types';
  */
 const POST_SELECT_FIELDS = {
     id: true,
-    createdAt: true,
-    updatedAt: true,
+    timestamp: true, 
+    lastActivityTimestamp: true, 
     content: true,
     likesCount: true,
     commentsCount: true,
@@ -87,13 +87,13 @@ export const getPosts = async (filters: GetPostsFilters): Promise<{ posts: Post[
                 break;
             case 'newest':
             default:
-                orderBy = { createdAt: 'desc' };
+                orderBy = { timestamp: 'desc' };
                 break;
         }
     } else { // viewMode === 'discussions'
         switch (sortMode) {
             case 'new':
-                orderBy = { createdAt: 'desc' };
+                orderBy = { timestamp: 'desc' }; 
                 break;
                 
             case 'top':
@@ -131,7 +131,7 @@ export const getPosts = async (filters: GetPostsFilters): Promise<{ posts: Post[
                     fetchedPosts = allPosts
                         .map(post => ({ 
                             ...post, 
-                            trendingScore: calculateTrendingScore(post.likesCount, post.commentsCount, post.createdAt) 
+                            trendingScore: calculateTrendingScore(post.likesCount, post.commentsCount, post.timestamp) 
                         }))
                         .sort((a, b) => (b as any).trendingScore - (a as any).trendingScore);
                 }
@@ -160,7 +160,7 @@ export const getPosts = async (filters: GetPostsFilters): Promise<{ posts: Post[
                 take: limit,
                 skip: offset,
                 select: POST_SELECT_FIELDS,
-            }) as Promise<Post[]>,
+            }) as unknown as Promise<Post[]>, // <-- CORRECTED CASTING
             prisma.post.count({ where }),
         ]);
     }
