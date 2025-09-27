@@ -401,3 +401,96 @@ export const createPost = async (
 
     return createdPost;
 };
+
+
+
+
+/**
+ * Service: Update Post
+ * @description Updates an existing post with complex business logic.
+ */
+export const updatePost = async (
+    postId: string, 
+    postData: Partial<Prisma.PostUpdateInput>, 
+    currentAuthUserId: string,
+    currentUser: AuthUser // Full user object needed for bankAccount check
+): Promise<Post> => {
+    
+    // 1. Fetch Current Post and Authorization Check
+    const currentPost = await prisma.post.findUnique({ 
+        where: { id: postId },
+    });
+
+    if (!currentPost) {
+        throw new NotFoundError('Post not found.');
+    }
+
+    // @authorization: User must be the author
+    if (currentPost.authorId !== currentAuthUserId) {
+        throw new ForbiddenError('You do not have permission to edit this post.');
+    }
+
+    // 2. Initial Data Preparation and Sanitization
+    const updateData: Partial<Prisma.PostUpdateInput> = {};
+    const originalIsAdvert = currentPost.isAdvert;
+    
+    // **Security:** The incoming content MUST be sanitized.
+    if (postData.content) {
+        updateData.content = sanitizePostContent(postData.content as string); 
+    }
+
+    // **Core Logic 2:** The `isAdvert` field from the request body MUST be ignored.
+    const { isAdvert, categoryId, ...safePostData } = postData;
+    Object.assign(updateData, safePostData); 
+
+    // 3. Category Update Logic
+    const newCategoryId = categoryId as string | undefined;
+
+    if (newCategoryId && newCategoryId !== currentPost.categoryId) {
+        
+        // 3a. Fetch the new Category record.
+        const newCategory = await prisma.category.findUnique({ 
+            where: { id: newCategoryId },
+            select: { type: true }
+        });
+
+        if (!newCategory) {
+            throw new BadRequestError('Invalid category ID.');
+        }
+
+        // 3b. Determine the new `isAdvert` value
+        const newIsAdvert = newCategory.type === 'advert';
+        
+        // 3c. Update the post's `isAdvert` field.
+        updateData.isAdvert = newIsAdvert;
+        updateData.categoryId = newCategoryId;
+
+        // --- Conditional Logic based on Type Change ---
+
+        if (newIsAdvert && !originalIsAdvert) {
+            // 3d. Post changing FROM discussion TO advert: Check bank account
+            if (!currentUser.hasBankAccount) {
+                // @errorHandling: 400 Bad Request
+                throw new BadRequestError('Bank account must be configured to convert a discussion to an advertisement.'); 
+            }
+        } else if (!newIsAdvert && originalIsAdvert) {
+            // 3e. Post changing FROM advert TO discussion: Nullify advert-specific fields
+            updateData.price = null;
+            updateData.condition = null;
+            updateData.brand = null;
+            updateData.deliveryOptions = null;
+            updateData.quantity = null;
+        }
+    }
+    
+    // 4. Final Database Update
+    // Core Logic 1: Set the `editedTimestamp`
+    updateData.editedTimestamp = new Date(); 
+
+    const updatedPost = await prisma.post.update({ 
+        where: { id: postId },
+        data: updateData,
+    }) as unknown as Post; 
+
+    return updatedPost;
+};
