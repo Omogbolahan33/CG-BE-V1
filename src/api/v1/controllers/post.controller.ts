@@ -72,10 +72,9 @@ export const getPostDetailsController = async (req: Request, res: Response, next
  */
 export const createPostController = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        // 🔥 Get the full AuthUser object from req.user (provided by middleware)
-        const authUser = req.user as AuthUser; 
+        // 🔥 FIX: The req.user property now exists due to the global type extension.
+        const authUser = req.user; 
         
-        // This failsafe check should never be hit if middleware is working, but it's good practice
         if (!authUser || !authUser.id) {
             throw new ForbiddenError("Authentication context missing.", 401);
         }
