@@ -2,7 +2,10 @@ import { Router } from 'express';
 import { getPostsController, 
         getPostDetailsController,
         createPostController, 
-        updatePostController, deletePostController } from '../controllers/post.controller';
+        updatePostController, 
+        deletePostController, 
+        likePostController, 
+        dislikePostController } from '../controllers/post.controller';
 import { authMiddleware } from '../../../middlewares/auth.middleware';
 
 const router = Router();
@@ -25,5 +28,13 @@ router.put('/:postId', authMiddleware, updatePostController);
 // Endpoint: DELETE /api/v1/posts/:postId
 // Authorization: User must be logged in
 router.delete('/:postId', authMiddleware, deletePostController); 
+
+//  Endpoint LIKE POST
+// Endpoint: POST /api/v1/posts/:postId/like
+router.post('/:postId/like', authMiddleware, likePostController); 
+
+//  Endpoint DISLIKE POST
+// Endpoint: POST /api/v1/posts/:postId/dislike
+router.post('/:postId/dislike', authMiddleware, dislikePostController); 
 
 export default router;
