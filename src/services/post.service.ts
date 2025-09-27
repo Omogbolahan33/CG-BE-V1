@@ -521,7 +521,7 @@ export const deletePost = async (
 
     // @authorization: User must be the author OR an Admin/Super Admin.
     const isAuthor = postToDelete.authorId === currentAuthUserId;
-    const isAdmin = currentUserRole === UserRole.ADMIN || currentUserRole === UserRole.SUPER_ADMIN;
+    const isAdmin = currentUserRole === UserRole.Admin || currentUserRole === UserRole.SuperAdmin;
 
     if (!isAuthor && !isAdmin) {
         throw new ForbiddenError('You do not have permission to delete this post.');
