@@ -145,3 +145,22 @@ export interface GetPostsFilters {
     offset?: number;
     minPrice?: number;
 }
+
+
+export interface CreatePostPayload {
+    title: string;
+    content: string;
+    price?: number;
+    categoryId: string;
+    media?: any[]; // Using 'any' for the JSON structure, but should be a dedicated type
+    brand?: string;
+    condition?: PostCondition;
+    deliveryOptions?: any; // Using 'any' for the JSON structure
+    quantity?: number;
+}
+
+
+export interface EssentialBackofficeSettings {
+    enablePostCreation: boolean;
+    enableAdvertisements: boolean;
+}
