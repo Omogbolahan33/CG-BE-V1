@@ -280,14 +280,16 @@ export const updateTransaction = async (
             }
             
             // 2.1. Handle proof of shipment file upload
-            let shippingProofUrl: string | undefined;
+            let shippingProofUrl: string | null = null; // Initialize as null
+
             if (proofOfShipment) {
-                shippingProofUrl = await uploadFile(proofOfShipment, 'shipment-proofs');
+                // Assuming uploadFile returns a string (the URL)
+                shippingProofUrl = await uploadFile(proofOfShipment, 'shipment-proofs'); 
             }
 
             updateData.status = TransactionStatus.Shipped;
             updateData.shippedAt = new Date();
-            if (trackingNumber) updateData.trackingNumber = trackingNumber;
+            if (trackingNumber) updateData.shippingProof = shippingProofUrl;         
             if (shippingProofUrl) updateData.shippingProofUrl = shippingProofUrl;
 
             notificationType = 'TRANSACTION_SHIPPED';
@@ -327,6 +329,15 @@ export const updateTransaction = async (
                 throw new ForbiddenError('Only the seller or an administrator can update tracking information.');
             }
             updateData.trackingNumber = trackingNumber;
+        }
+        // Allow updating only shippingProof without changing status (if a file was uploaded)
+        if (proofOfShipment) {
+            if (!isSeller && !isAdmin) {
+                throw new ForbiddenError('Only the seller or an administrator can update shipping information.');
+            }
+            const shippingProofUrl = await uploadFile(proofOfShipment, 'shipment-proofs');
+            // ✅ FIX: Use the correct schema name 'shippingProof'
+            updateData.shippingProof = shippingProofUrl; 
         }
     }
     
