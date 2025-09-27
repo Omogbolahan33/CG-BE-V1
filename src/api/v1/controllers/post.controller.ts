@@ -1,0 +1,37 @@
+import { Request, Response, NextFunction } from 'express';
+import { getPosts, GetPostsFilters } from '../../../services/post.service'; 
+
+/**
+ * API: Get Posts
+ * @description Handles the request to fetch posts with filtering and sorting.
+ */
+export const getPostsController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { viewMode, sortMode, advertSort, limit, offset, minPrice } = req.query;
+
+        // Basic validation and type conversion
+        if (viewMode !== 'discussions' && viewMode !== 'adverts') {
+            throw new Error('viewMode is required and must be "discussions" or "adverts".');
+        }
+
+        const filters: GetPostsFilters = {
+            viewMode: viewMode as 'discussions' | 'adverts',
+            sortMode: sortMode as 'top' | 'trending' | 'new',
+            advertSort: advertSort as 'newest' | 'price_asc' | 'price_desc',
+            limit: limit ? parseInt(limit as string, 10) : undefined,
+            offset: offset ? parseInt(offset as string, 10) : undefined,
+            minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
+        };
+
+        const { posts, total } = await getPosts(filters);
+
+        return res.status(200).json({
+            status: 'success',
+            message: 'Posts fetched successfully.',
+            data: { posts, total },
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
