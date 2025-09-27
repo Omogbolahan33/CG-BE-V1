@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getTransactions, createTransaction } from '../../../services/transaction.service';
 import { UserRole } from '@prisma/client';
-import { BadRequestError } from '../errors/BadRequestError';
+import { BadRequestError } from '../../../errors/BadRequestError';
 
 
 // Custom interface for authenticated request
