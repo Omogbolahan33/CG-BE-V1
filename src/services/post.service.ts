@@ -145,7 +145,7 @@ export const getPosts = async (filters: GetPostsFilters): Promise<{ posts: Post[
             }
                 
             default:
-                orderBy = { createdAt: 'desc' };
+                orderBy = { timestamp: 'desc' };
                 break;
         }
     }
