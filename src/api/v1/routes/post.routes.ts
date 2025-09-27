@@ -12,7 +12,7 @@ router.get('/', getPostsController);
 router.get('/:postId', getPostDetailsController);
 
 // Endpoint: POST /api/v1/posts 
-// Authorization: Requires user to be logged in (via authMiddleware)
+// Authorization: CREATE POST Requires user to be logged in (via authMiddleware)
 router.post('/', authMiddleware, createPostController);
 
 export default router;
