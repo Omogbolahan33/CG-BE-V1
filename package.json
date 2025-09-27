@@ -32,6 +32,7 @@
     "@types/cookie-parser": "^1.4.9",
     "@types/sanitize-html": "^2.16.0",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.58.9",
     "cookie-parse": "^0.4.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
