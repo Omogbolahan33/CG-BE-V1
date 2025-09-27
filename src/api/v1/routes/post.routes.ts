@@ -10,4 +10,8 @@ router.get('/', getPostsController);
 // Fetches a single post's details
 router.get('/:postId', getPostDetailsController);
 
+// Endpoint: POST /api/v1/posts 
+// Authorization: Requires user to be logged in (via authMiddleware)
+router.post('/', authMiddleware, createPostController);
+
 export default router;
