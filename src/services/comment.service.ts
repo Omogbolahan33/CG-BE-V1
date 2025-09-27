@@ -65,11 +65,11 @@ export const addComment = async (
             data: {
                 content: sanitizedContent,
                 media: commentData.media as Prisma.JsonArray,
-                postId: postId,
-                authorId: currentAuthUserId,
-                parentId: parentId,
-            } as Prisma.CommentCreateInput 
-        }) as unknown as Comment;
+                post: { connect: { id: postId } }, 
+                ...(parentId && { parent: { connect: { id: parentId } } }),
+                author: { connect: { id: currentAuthUserId } },
+            } as Prisma.CommentCreateInput
+        }) as unknown as Comment; 
 
         // 3.2. Atomically update the parent post's lastActivityTimestamp
         await tx.post.update({
