@@ -31,7 +31,6 @@ const POST_SELECT_FIELDS = {
     commentsCount: true,
     pinnedAt: true,
     price: true,
-    isAdvert: true, 
     authorId: true,
     author: {
         select: { id: true, username: true } // Example of including related data
