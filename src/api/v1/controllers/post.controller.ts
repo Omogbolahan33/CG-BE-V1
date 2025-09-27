@@ -1,6 +1,7 @@
+import { UserRole } from '@prisma/client';
 import { Request, Response, NextFunction } from 'express';
 import { GetPostsFilters, AuthUser, CreatePostPayload } from '../../../types';
-import { getPosts, getPostDetails, createPost, updatePost } from '../../../services/post.service'; 
+import { getPosts, getPostDetails, createPost, updatePost, deletePost } from '../../../services/post.service'; 
 import { ForbiddenError } from '../../../errors/ForbiddenError';
 
 /**
@@ -96,6 +97,11 @@ export const createPostController = async (req: Request, res: Response, next: Ne
 
 
 
+
+/**
+ * API: Update Post
+ * @description Handles the request to create a new post using the authenticated user context.
+ */
 // Custom interface for authenticated request
 interface AuthRequest extends Request {
     userId?: string;
@@ -128,6 +134,44 @@ export const updatePostController = async (req: AuthRequest, res: Response, next
             message: 'Post updated successfully.',
             data: updatedPost
         });
+
+    } catch (error: any) {
+        // Delegate error handling to the Express error handler
+        next(error);
+    }
+};
+
+
+
+/**
+ * API: Delete Post
+ * @description Handles the request to create a new post using the authenticated user context.
+ */
+// Custom interface for authenticated request
+interface AuthRequest extends Request {
+    userId?: string;
+    userRole?: UserRole; // Assuming authMiddleware sets the user's role
+}
+
+export const deletePostController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const postId = req.params.postId;
+        const currentAuthUserId = req.userId; 
+        const currentUserRole = req.userRole; 
+
+        if (!currentAuthUserId || !currentUserRole) {
+            // Should be caught by authMiddleware, but check defensively
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        await deletePost(
+            postId, 
+            currentAuthUserId,
+            currentUserRole
+        );
+
+        // Success response for DELETE is typically 204 No Content
+        return res.status(204).send();
 
     } catch (error: any) {
         // Delegate error handling to the Express error handler
