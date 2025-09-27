@@ -6,7 +6,9 @@ import { getPosts,
         createPost, 
         updatePost, 
         deletePost, 
-        likePost, dislikePost, followPost } from '../../../services/post.service'; 
+        likePost, 
+        dislikePost, 
+        followPost,flagPost } from '../../../services/post.service'; 
 import { ForbiddenError } from '../../../errors/ForbiddenError';
 
 /**
@@ -258,6 +260,31 @@ export const followPostController = async (req: AuthRequest, res: Response, next
 
         // Success response
         return res.status(200).json(result);
+
+    } catch (error: any) {
+        next(error);
+    }
+};
+
+
+
+
+// --- Flag a Post Controller ---
+export const flagPostController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const postId = req.params.postId;
+        const currentAuthUserId = req.userId; 
+        
+        if (!currentAuthUserId) {
+            // Should be caught by authMiddleware, but check defensively
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        const result = await flagPost(postId, currentAuthUserId);
+
+        // Success response
+        // Note: The Swagger spec suggests 200 OK for 'Post flagged successfully.'
+        return res.status(200).json(result); 
 
     } catch (error: any) {
         next(error);
