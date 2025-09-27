@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { addComment, editComment,deleteComment } from '../../../services/comment.service';
+import { addComment, editComment, deleteComment, likeComment, dislikeComment } from '../../../services/comment.service';
 import { AuthUser } from '../../../types'; 
 import { UserRole } from '@prisma/client';
 // Custom interface for authenticated request
@@ -96,6 +96,58 @@ export const deleteCommentController = async (req: AuthRequest, res: Response, n
 
         // Success response for DELETE is 204 No Content
         return res.status(204).send();
+
+    } catch (error: any) {
+        next(error);
+    }
+};
+
+
+
+
+
+// --- Like Comment Controller ---
+
+export const likeCommentController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { postId, commentId } = req.params;
+        const currentAuthUserId = req.userId; 
+        const currentUserRole = req.userRole; 
+
+        if (!currentAuthUserId || !currentUserRole) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        const result = await likeComment(postId, commentId, currentAuthUserId, currentUserRole);
+
+        // Realtime: This event would typically be emitted here
+        // io.emit(`commentUpdate:${postId}`, result); 
+
+        return res.status(200).json(result);
+
+    } catch (error: any) {
+        next(error);
+    }
+};
+
+// --- Dislike Comment Controller ---
+
+export const dislikeCommentController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { postId, commentId } = req.params;
+        const currentAuthUserId = req.userId; 
+        const currentUserRole = req.userRole; 
+
+        if (!currentAuthUserId || !currentUserRole) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        const result = await dislikeComment(postId, commentId, currentAuthUserId, currentUserRole);
+
+        // Realtime: Emit event on success
+        // io.emit(`commentUpdate:${postId}`, result); 
+
+        return res.status(200).json(result);
 
     } catch (error: any) {
         next(error);
