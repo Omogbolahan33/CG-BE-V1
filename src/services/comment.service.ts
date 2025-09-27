@@ -193,7 +193,7 @@ export const editComment = async (
         where: { id: commentId },
         data: {
             content: sanitizedContent,
-            editedAt: new Date(), // Set the edited timestamp
+            editedTimestamp: new Date(), // Set the edited timestamp
         },
     }) as unknown as Comment; // Cast to your simple Comment type
 
