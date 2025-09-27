@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { GetPostsFilters, AuthUser, CreatePostPayload } from '../../../types';
-import { getPosts, getPostDetails, createPost  } from '../../../services/post.service'; 
+import { getPosts, getPostDetails, createPost, updatePost } from '../../../services/post.service'; 
 import { ForbiddenError } from '../../../errors/ForbiddenError';
 
 /**
@@ -91,5 +91,46 @@ export const createPostController = async (req: Request, res: Response, next: Ne
 
     } catch (error) {
         next(error); 
+    }
+};
+
+
+
+// Custom interface for authenticated request
+interface AuthRequest extends Request {
+    userId?: string;
+    user?: AuthUser;
+}
+
+export const updatePostController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const postId = req.params.postId;
+        const postData = req.body;
+        
+        const currentAuthUserId = req.userId; 
+        const currentUser = req.user; 
+
+        // This should be guaranteed by authMiddleware, but we check defensively
+        if (!currentAuthUserId || !currentUser) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        const updatedPost = await updatePost(
+            postId, 
+            postData, 
+            currentAuthUserId,
+            currentUser
+        );
+
+        // Success response
+        return res.status(200).json({
+            status: 'success',
+            message: 'Post updated successfully.',
+            data: updatedPost
+        });
+
+    } catch (error: any) {
+        // Delegate error handling to the Express error handler
+        next(error);
     }
 };
