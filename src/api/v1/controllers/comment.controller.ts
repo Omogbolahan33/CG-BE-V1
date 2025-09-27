@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { addComment } from '../../../services/comment.service';
-import { AuthUser } from '../types'; 
+import { AuthUser } from '../../../types'; 
 import { UserRole } from '@prisma/client';
 
 // Custom interface for authenticated request
