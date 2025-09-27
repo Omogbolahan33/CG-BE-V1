@@ -1,7 +1,7 @@
 // src/utils/sanitize-html.ts
 
 // Install this package first: npm install sanitize-html @types/sanitize-html
-import sanitizeHtml, { IOptions, ITransformTag } from 'sanitize-html'; 
+import sanitizeHtml, { IOptions } from 'sanitize-html'; 
 
 /**
  * Custom implementation of the default transform function.
@@ -10,7 +10,7 @@ import sanitizeHtml, { IOptions, ITransformTag } from 'sanitize-html';
  * @param attribs The tag's attributes.
  * @returns An object containing the tag name and attributes.
  */
-const defaultTransform: ITransformTag = (tagName: string, attribs: { [key: string]: string }) => ({
+const defaultTransform: (tagName: string, attribs: { [key: string]: string }) => { tagName: string, attribs: { [key: string]: string } } = (tagName, attribs) => ({
     tagName,
     attribs
 });
