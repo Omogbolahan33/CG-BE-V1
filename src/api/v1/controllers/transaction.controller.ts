@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getTransactions } from '../services/transaction.service';
-import { UserRole } from '@prisma/client'; // Assuming UserRole is used
+import { UserRole } from '@prisma/client';
 
 // Custom interface for authenticated request
 interface AuthRequest extends Request {
@@ -29,4 +29,3 @@ export const getTransactionsController = async (req: AuthRequest, res: Response,
     }
 };
 
-// ... export other transaction controllers here
