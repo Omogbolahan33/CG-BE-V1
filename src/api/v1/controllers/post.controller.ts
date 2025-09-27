@@ -1,7 +1,12 @@
 import { UserRole } from '@prisma/client';
 import { Request, Response, NextFunction } from 'express';
 import { GetPostsFilters, AuthUser, CreatePostPayload } from '../../../types';
-import { getPosts, getPostDetails, createPost, updatePost, deletePost } from '../../../services/post.service'; 
+import { getPosts, 
+        getPostDetails, 
+        createPost, 
+        updatePost, 
+        deletePost, 
+        likePost, dislikePost } from '../../../services/post.service'; 
 import { ForbiddenError } from '../../../errors/ForbiddenError';
 
 /**
@@ -175,6 +180,63 @@ export const deletePostController = async (req: AuthRequest, res: Response, next
 
     } catch (error: any) {
         // Delegate error handling to the Express error handler
+        next(error);
+    }
+};
+
+
+
+// Custom interface for authenticated request (ensuring userRole is passed)
+interface AuthRequest extends Request {
+    userId?: string;
+    userRole?: UserRole; // Assuming authMiddleware sets the user's role
+}
+
+// --- Like Post Controller ---
+
+export const likePostController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const postId = req.params.postId;
+        const currentAuthUserId = req.userId; 
+        const currentUserRole = req.userRole; 
+
+        if (!currentAuthUserId || !currentUserRole) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        const result = await likePost(postId, currentAuthUserId, currentUserRole);
+
+        // Realtime: This event would typically be emitted here or in a wrapper after the controller.
+        // Assuming your setup handles socket events after the response is sent.
+        // io.emit(`postUpdate:${postId}`, result); 
+
+        return res.status(200).json(result);
+
+    } catch (error: any) {
+        next(error);
+    }
+};
+
+// --- Dislike Post Controller ---
+
+export const dislikePostController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const postId = req.params.postId;
+        const currentAuthUserId = req.userId; 
+        const currentUserRole = req.userRole; 
+
+        if (!currentAuthUserId || !currentUserRole) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        const result = await dislikePost(postId, currentAuthUserId, currentUserRole);
+
+        // Realtime: Emit event on success
+        // io.emit(`postUpdate:${postId}`, result); 
+
+        return res.status(200).json(result);
+
+    } catch (error: any) {
         next(error);
     }
 };
