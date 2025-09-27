@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { addComment, editComment } from '../../../services/comment.service';
+import { addComment, editComment,deleteComment } from '../../../services/comment.service';
 import { AuthUser } from '../../../types'; 
 import { UserRole } from '@prisma/client';
 // Custom interface for authenticated request
@@ -8,6 +8,8 @@ interface AuthRequest extends Request {
     userRole?: UserRole; 
 }
 
+
+// Add comment Controller
 export const addCommentController = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const postId = req.params.postId;
@@ -39,6 +41,7 @@ export const addCommentController = async (req: AuthRequest, res: Response, next
 };
 
 
+// Edit comment Controller
 
 export const editCommentController = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -63,6 +66,36 @@ export const editCommentController = async (req: AuthRequest, res: Response, nex
 
         // Success response
         return res.status(200).json(updatedComment);
+
+    } catch (error: any) {
+        next(error);
+    }
+};
+
+
+// Delete comment Controller
+export const deleteCommentController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { postId, commentId } = req.params;
+        const currentAuthUserId = req.userId;
+        const currentUserRole = req.userRole;
+
+        if (!currentAuthUserId || !currentUserRole) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        await deleteComment(
+            postId, 
+            commentId, 
+            currentAuthUserId,
+            currentUserRole
+        );
+
+        // Realtime: Emit comment delete event
+        // io.emit(`commentDelete:${postId}`, commentId);
+
+        // Success response for DELETE is 204 No Content
+        return res.status(204).send();
 
     } catch (error: any) {
         next(error);
