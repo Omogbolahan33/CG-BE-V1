@@ -113,12 +113,16 @@ export interface ReportUserPayload {
 }
 
 
-// Define the Post interface matching the select fields in the service
-export interface Post extends PrismaPost {
-    // No need to add custom fields unless they were added in the service map.
-    // If you add computed fields (like 'trendingScore') in the service, you'd add them here
-    // trendingScore?: number; 
-    // engagementScore?: number;
+// Define the Post interface, making sure to use the correct fields
+export interface Post extends Omit<PrismaPost, 'createdAt' | 'updatedAt'> {
+    // Override/Ensure fields used in custom logic are present
+    timestamp: Date;
+    lastActivityTimestamp: Date;
+    likesCount: number;
+    commentsCount: number;
+    // Add computed scores for the in-memory sorting paths
+    trendingScore?: number; 
+    engagementScore?: number;
 }
 
 
