@@ -5,7 +5,8 @@ import { getPostsController,
         updatePostController, 
         deletePostController, 
         likePostController, 
-        dislikePostController, followPostController } from '../controllers/post.controller';
+        dislikePostController, 
+        followPostController, flagPostController } from '../controllers/post.controller';
 import { authMiddleware } from '../../../middlewares/auth.middleware';
 
 const router = Router();
@@ -40,5 +41,9 @@ router.post('/:postId/dislike', authMiddleware, dislikePostController);
 //   FOLLOW/UNFOLLOW POST
 // Endpoint: POST /api/v1/posts/:postId/follow
 router.post('/:postId/follow', authMiddleware, followPostController); 
+
+//   FLAG POST
+// Endpoint: POST /api/v1/posts/:postId/flag
+router.post('/:postId/flag', authMiddleware, flagPostController); 
 
 export default router;
