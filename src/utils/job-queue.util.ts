@@ -9,7 +9,7 @@ const REDIS_CONNECTION = new IORedis({
     port: parseInt(process.env.REDIS_PORT || '6379'),
     username: process.env.REDIS_USERNAME || 'default',
     password: process.env.REDIS_PASSWORD,
-    maxRetriesPerRequest: null,
+    maxRetriesPerRequest: 5,
     
     // Required for the 'rediss://' protocol from Render
     tls: {
