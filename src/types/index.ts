@@ -120,3 +120,13 @@ export interface Post extends PrismaPost {
     // trendingScore?: number; 
     // engagementScore?: number;
 }
+
+
+export interface GetPostsFilters {
+    viewMode: 'discussions' | 'adverts';
+    sortMode?: 'top' | 'trending' | 'new';
+    advertSort?: 'newest' | 'price_asc' | 'price_desc';
+    limit?: number;
+    offset?: number;
+    minPrice?: number;
+}
