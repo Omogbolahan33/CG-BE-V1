@@ -8,7 +8,7 @@ import authRoutes from './auth.route';
 import userRouter from './user.routes'; 
 import postRoutes from './post.routes';
 import commentRouter from './comment.routes';
-import transactionRouter from './routes/transaction.routes'; 
+import transactionRouter from './transaction.routes'; 
 
 const v1Router = Router();
 
