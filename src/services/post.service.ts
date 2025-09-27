@@ -462,7 +462,7 @@ export const updatePost = async (
         
         // 3c. Update the post's `isAdvert` field.
         updateData.isAdvert = newIsAdvert;
-        updateData.category = { connect: { id: newCategoryId };
+        updateData.category = { connect: { id: newCategoryId }};
 
         // --- Conditional Logic based on Type Change ---
 
