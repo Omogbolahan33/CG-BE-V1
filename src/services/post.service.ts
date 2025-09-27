@@ -4,10 +4,14 @@ import prisma from '../utils/prisma';
 import { Prisma } from '@prisma/client'; 
 import { calculateTrendingScore } from '../utils/score.util';
 import { sanitizePostContent } from '../utils/sanitize-html'; // <-- Correct, singular import of wrapper
+import { getBackofficeSettings } from '../utils/settings.util'; 
+import { queueJob } from '../utils/job-queue.util'; 
 import { nestComments, NestedComment } from '../utils/comment-nesting.util';
 import { BadRequestError } from '../errors/BadRequestError'; // <-- Required for input validation
 import { NotFoundError } from '../errors/NotFoundError';
-import { Post, GetPostsFilters, Comment } from '../types'; 
+import { ForbiddenError } from '../errors/ForbiddenError'; 
+import { Post, GetPostsFilters, Comment, AuthUser, CreatePostPayload } from '../types'; 
+
 
 /**
  * Defines the minimum required fields from the Post model for fetching.
@@ -279,4 +283,116 @@ export const getPostDetails = async (postId: string): Promise<Post> => {
     delete (finalPost as any).commentsCount;
 
     return finalPost;
+};
+
+
+
+/**
+ * API: Create Post
+ * @description Creates a new post with zero redundant DB calls for user details.
+ */
+export const createPost = async (
+    postData: CreatePostPayload, 
+    authUser: AuthUser // Contains ID, role, isBanned, and hasBankAccount status
+): Promise<Post> => {
+    
+    const { categoryId, title, content, price, ...advertData } = postData;
+    const authorId = authUser.id; 
+
+    // --- 1. Fetch Category and Global Settings ---
+
+    // DB Call 1: Fetch category to determine isAdvert status
+    const category = await prisma.category.findUnique({
+        where: { id: categoryId },
+        select: { id: true, type: true } 
+    });
+
+    if (!category) {
+        throw new BadRequestError(`Category ID ${categoryId} is invalid.`, 400);
+    }
+    
+    // DB Call 2 (or Cache Hit): Fetch global settings
+    const settings = await getBackofficeSettings(); 
+    const isAdvert = category.type === 'advert';
+    
+    // --- 2. Security and Pre-conditions (Using AuthUser Data) ---
+    
+    // Pre-condition 1: User Ban Check
+    if (authUser.isBanned) {
+        // @errorHandling: 403 Forbidden
+        throw new ForbiddenError("You are banned and cannot create posts.", 403);
+    }
+    
+    // Pre-condition 2: General Post Creation Feature Flag
+    if (!settings.enablePostCreation) {
+        // @errorHandling: 403 Forbidden
+        throw new ForbiddenError("Post creation is currently disabled.", 403);
+    }
+    
+    // Pre-condition 3: Advertisement-Specific Checks
+    if (isAdvert) {
+        if (!settings.enableAdvertisements) {
+            // @errorHandling: 403 Forbidden
+            throw new ForbiddenError("Advertisement feature is disabled.", 403);
+        }
+        // User MUST have a bankAccount configured (Uses authUser.hasBankAccount, NO DB CALL)
+        if (!authUser.hasBankAccount) {
+            // @errorHandling: 400 Bad Request
+            throw new BadRequestError("Bank account must be configured to create an advertisement.", 400);
+        }
+        // Advertisements must have a valid price
+        if (price === undefined || price === null || (price as number) <= 0) {
+            // @errorHandling: 400 Bad Request
+            throw new BadRequestError("Advertisements must include a positive price.", 400);
+        }
+    }
+    
+    // --- 3. Content Security and Core Creation ---
+    
+    // @security: Sanitize the incoming content before DB storage
+    const sanitizedContent = sanitizePostContent(content); 
+
+    // DB Call 3: Create Post
+    const createdPost = await prisma.post.create({
+        data: {
+            title,
+            content: sanitizedContent,
+            isAdvert: isAdvert,
+            price: price || null,
+            
+            author: { connect: { id: authorId } },
+            category: { connect: { id: categoryId } },
+            ...advertData, 
+        },
+        // Select all required fields for the response
+        // Note: You must ensure this select matches your Post interface
+        select: {
+            id: true, title: true, content: true, timestamp: true, lastActivityTimestamp: true, 
+            isAdvert: true, price: true, pinnedAt: true, isSoldOut: true, isCommentingRestricted: true,
+            quantity: true, brand: true, condition: true, deliveryOptions: true, media: true,
+            authorId: true, categoryId: true, editedTimestamp: true
+        }
+    }) as Post; 
+
+
+    // --- 4. Side Effects (Background Jobs) ---
+    
+    // Side Effect 1: Activity Log (Synchronous DB write)
+    await prisma.activityLog.create({
+        data: {
+            userId: authorId,
+            type: 'POST_CREATED',
+            details: { postId: createdPost.id, title: createdPost.title }
+        }
+    });
+
+    // Side Effect 2: Notification Fan-Out (Asynchronous BullMQ Job)
+    // @scalability: Non-blocking call.
+    queueJob('NOTIFY_FOLLOWERS_OF_NEW_POST', {
+        authorId: authorId,
+        postId: createdPost.id,
+        isAdvert: isAdvert
+    });
+
+    return createdPost;
 };
