@@ -1,7 +1,6 @@
 // src/services/post.service.ts
 
-import prisma from '../utils/prisma';
-import { Prisma } from '@prisma/client'; 
+import prisma, { Prisma } from '../utils/prisma';
 import { calculateTrendingScore } from '../utils/score.util';
 import { sanitizePostContent } from '../utils/sanitize-html'; // <-- Correct, singular import of wrapper
 import { getBackofficeSettings } from '../utils/settings.util'; 
@@ -411,7 +410,7 @@ export const createPost = async (
  */
 export const updatePost = async (
     postId: string, 
-    postData: Partial<Prisma.PostUpdateInput>, 
+    postData: any, 
     currentAuthUserId: string,
     currentUser: AuthUser // Full user object needed for bankAccount check
 ): Promise<Post> => {
@@ -440,7 +439,7 @@ export const updatePost = async (
     }
 
     // **Core Logic 2:** The `isAdvert` field from the request body MUST be ignored.
-    const { isAdvert, categoryId, ...safePostData } = postData;
+    const { isAdvert, categoryId, ...safePostData } = postData as any;
     Object.assign(updateData, safePostData); 
 
     // 3. Category Update Logic
@@ -463,7 +462,7 @@ export const updatePost = async (
         
         // 3c. Update the post's `isAdvert` field.
         updateData.isAdvert = newIsAdvert;
-        updateData.categoryId = newCategoryId;
+        updateData.category = { connect: { id: newCategoryId }
 
         // --- Conditional Logic based on Type Change ---
 
@@ -478,7 +477,7 @@ export const updatePost = async (
             updateData.price = null;
             updateData.condition = null;
             updateData.brand = null;
-            updateData.deliveryOptions = null;
+            updateData.deliveryOptions = Prisma.JsonNull.SET;
             updateData.quantity = null;
         }
     }
