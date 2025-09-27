@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { addComment } from '../../../services/post.service'; // Assuming service is here
+import { addComment } from '../../../services/comment.service';
 import { AuthUser } from '../types'; 
 import { UserRole } from '@prisma/client';
 
@@ -38,4 +38,4 @@ export const addCommentController = async (req: AuthRequest, res: Response, next
         next(error);
     }
 };
-// ... export other comment controllers here
+
