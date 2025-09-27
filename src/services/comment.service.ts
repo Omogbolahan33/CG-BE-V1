@@ -3,7 +3,7 @@ import { Post, Comment, AuthUser } from '../types';
 import { ForbiddenError } from '../errors/ForbiddenError';
 import { NotFoundError } from '../errors/NotFoundError';
 // ... import all necessary utilities:
-import { sanitizeCommentContent } from '../utils/sanitize-html'; 
+import { sanitizePostContent as sanitizeCommentContent } from '../utils/sanitize-html'; 
 import { getBackofficeSettings } from '../utils/settings.util'; 
 import { parseMentions } from '../utils/mention.util'; 
 import { queueJob } from '../utils/job-queue.util'; 
