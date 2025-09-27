@@ -47,7 +47,7 @@ export const getBackofficeSettings = async (): Promise<EssentialBackofficeSettin
     const essentialSettings: EssentialBackofficeSettings = {
         enablePostCreation: settingsRecord.enablePostCreation,
         enableAdvertisements: settingsRecord.enableAdvertisements,
-        maintenanceMode:      settingsRecord.enablemaintenanceMode,
+        maintenanceMode:      settingsRecord.maintenanceMode,
         enablePayments:       settingsRecord.enablePayments,
         enableSignups:        settingsRecord.enableSignups,
         enableLogins:         settingsRecord.enableLogins,
