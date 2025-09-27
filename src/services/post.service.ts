@@ -16,6 +16,16 @@ const POST_SELECT_FIELDS = {
     title: true, 
     timestamp: true, 
     lastActivityTimestamp: true, 
+    isAdvert: true, 
+    isSoldOut: true, // Required
+    isCommentingRestricted: true, // Required
+    categoryId: true,
+    editedTimestamp: true,
+    quantity: true,
+    brand: true,
+    condition: true,
+    deliveryOptions: true,
+    media: true
     content: true,
     likesCount: true,
     commentsCount: true,
@@ -152,18 +162,23 @@ export const getPosts = async (filters: GetPostsFilters): Promise<{ posts: Post[
     }
 
     // --- 4. Execute Query (Standard DB path) ---
-    if (shouldQueryFromDB) {
-        // CORRECTION: Use $transaction for consistency in fetching count and data
-        [fetchedPosts, total] = await prisma.$transaction([
-            prisma.post.findMany({
+   if (shouldQueryFromDB) {
+        // FIX 2: Use the functional overload for $transaction to simplify type handling.
+        const [postsData, countData] = await prisma.$transaction(async (tx) => {
+            const posts = await tx.post.findMany({
                 where,
                 orderBy,
                 take: limit,
                 skip: offset,
                 select: POST_SELECT_FIELDS,
-            }) as unknown as Promise<Post[]>, // <-- CORRECTED CASTING
-            prisma.post.count({ where }),
-        ]);
+            });
+            const count = await tx.post.count({ where });
+            return [posts, count];
+        });
+        
+        // Assign results after casting
+        fetchedPosts = postsData as unknown as Post[]; 
+        total = countData;
     }
 
 
