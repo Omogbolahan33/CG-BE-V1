@@ -8,7 +8,7 @@ import { User as PrismaUser,
         Transaction as PrismaTransaction,
         Review as PrismaReview,
         Post as PrismaPost,
-        Comment as PrismaComment
+        Comment as PrismaComment, PostCondition
        } from '@prisma/client';
 
 // Re-export the core types for use across the application
