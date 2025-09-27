@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { addComment, editComment, deleteComment, likeComment, dislikeComment } from '../../../services/comment.service';
+import { addComment, 
+        editComment, 
+        deleteComment, 
+        likeComment, 
+        dislikeComment, flagComment } from '../../../services/comment.service';
 import { AuthUser } from '../../../types'; 
 import { UserRole } from '@prisma/client';
 // Custom interface for authenticated request
@@ -148,6 +152,32 @@ export const dislikeCommentController = async (req: AuthRequest, res: Response, 
         // io.emit(`commentUpdate:${postId}`, result); 
 
         return res.status(200).json(result);
+
+    } catch (error: any) {
+        next(error);
+    }
+
+};
+
+
+
+
+
+// --- Flag Comment Controller ---
+
+export const flagCommentController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { postId, commentId } = req.params;
+        const currentAuthUserId = req.userId; 
+        
+        if (!currentAuthUserId) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        const result = await flagComment(postId, commentId, currentAuthUserId);
+
+        // Success response
+        return res.status(200).json(result); 
 
     } catch (error: any) {
         next(error);
