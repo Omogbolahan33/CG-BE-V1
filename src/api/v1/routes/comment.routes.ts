@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../../middlewares/auth.middleware';
-import { addCommentController, editCommentController, deleteCommentController } from '../controllers/comment.controller'; 
+import { addCommentController, 
+        editCommentController, 
+        deleteCommentController, likeCommentController, dislikeCommentController } from '../controllers/comment.controller'; 
 
 const router = Router({ mergeParams: true });
 
@@ -16,5 +18,13 @@ router.put('/:commentId', authMiddleware, editCommentController);
 //  DELETE COMMENT
 // Endpoint: DELETE /:postId/comments/:commentId
 router.delete('/:commentId', authMiddleware, deleteCommentController); 
+
+// LIKE COMMENT
+// Endpoint: POST /:postId/comments/:commentId/like
+router.post('/:commentId/like', authMiddleware, likeCommentController); 
+
+// DISLIKE COMMENT
+// Endpoint: POST /:postId/comments/:commentId/dislike
+router.post('/:commentId/dislike', authMiddleware, dislikeCommentController); 
 
 export default router;
