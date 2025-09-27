@@ -478,7 +478,7 @@ export const updatePost = async (
             updateData.price = null;
             updateData.condition = null;
             updateData.brand = null;
-            updateData.deliveryOptions = Prisma.JsonNull.SET;
+            updateData.deliveryOptions = Prisma.JsonNull.Any;
             updateData.quantity = null;
         }
     }
