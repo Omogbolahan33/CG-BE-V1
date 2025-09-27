@@ -382,8 +382,13 @@ export const createPost = async (
         data: {
             userId: authorId,
             type: 'POST_CREATED',
-            details: { postId: createdPost.id, title: createdPost.title }
+            // 🔥 FIX: Stringify the object if ActivityLog.details is a String
+            // If your schema uses 'Json', remove JSON.stringify().
+            details: JSON.stringify({ postId: createdPost.id, title: createdPost.title }) 
         }
+            //Recommendation: If you want to query structured data later 
+            //(e.g., "Find all activity logs related to post X"), 
+            //you must update your Prisma model to use details Json? for this field.
     });
 
     // Side Effect 2: Notification Fan-Out (Asynchronous BullMQ Job)
