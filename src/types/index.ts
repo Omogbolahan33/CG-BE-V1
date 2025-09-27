@@ -10,7 +10,6 @@ import { User as PrismaUser,
         Post as PrismaPost,
         Comment as PrismaComment, 
         PostCondition,
-        Transaction as PrismaTransaction
        } from '@prisma/client';
 
 // Re-export the core types for use across the application
@@ -20,7 +19,6 @@ export type NotificationType = PrismaNotificationType;
 export type Transaction = PrismaTransaction;
 export type Review = PrismaReview;
 export type Comment = PrismaComment;
-export type Transaction = PrismaTransaction;
 
 // --- Define Custom Types for API Responses/Requests ---
 
