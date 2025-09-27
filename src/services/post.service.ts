@@ -575,70 +575,84 @@ const toggleVote = async (
         // 1. Fetch the current state of the post
         const post = await tx.post.findUnique({
             where: { id: postId },
-            select: { likedBy: true, dislikedBy: true, authorId: true }
+            select: { 
+                likedBy: { select: { id: true } }, 
+                dislikedBy: { select: { id: true } },
+                authorId: true 
+            }
         });
 
         if (!post) {
             throw new NotFoundError('Post not found.');
         }
 
-        const { likedBy, dislikedBy } = post;
-        const currentlyLiked = likedBy.includes(userId);
-        const currentlyDisliked = dislikedBy.includes(userId);
+       // Convert relations to simple ID arrays for easier logic checks
+        const likedByIds = post.likedBy.map(u => u.id);
+        const dislikedByIds = post.dislikedBy.map(u => u.id);
         
+        const currentlyLiked = likedByIds.includes(userId);
+        const currentlyDisliked = dislikedByIds.includes(userId);
+        
+        // This object holds all the relational changes
         let updateData: Prisma.PostUpdateInput = {
-            lastActivityTimestamp: new Date(), // Core Logic 3: Update timestamp
+            lastActivityTimestamp: new Date(),
         };
         let notificationNeeded = false;
+
+        const userConnect = { id: userId }; // Standard object for connect/disconnect operations
 
         if (isLikeAction) {
             // Logic for LIKE Post
             
-            // 1. If user ID is in dislikedBy, remove it.
+            // 1. If user ID is in dislikedBy, remove it (DISCONNECT).
             if (currentlyDisliked) {
-                updateData.dislikedBy = { set: dislikedBy.filter(id => id !== userId) };
+                updateData.dislikedBy = { disconnect: userConnect };
             }
 
-            // 2. If user ID is in likedBy, remove it (UNLIKE). Else, add it (LIKE).
+            // 2. If user ID is in likedBy, remove it (UNLIKE - DISCONNECT). Else, add it (LIKE - CONNECT).
             if (currentlyLiked) {
-                updateData.likedBy = { set: likedBy.filter(id => id !== userId) }; // Remove (Unlike)
+                updateData.likedBy = { disconnect: userConnect };
             } else {
-                updateData.likedBy = { push: userId }; // Add (Like)
-                notificationNeeded = (post.authorId !== userId); // Side Effect check
+                updateData.likedBy = { connect: userConnect };
+                notificationNeeded = (post.authorId !== userId); 
             }
 
         } else {
             // Logic for DISLIKE Post
 
-            // 1. If user ID is in likedBy, remove it.
+            // 1. If user ID is in likedBy, remove it (DISCONNECT).
             if (currentlyLiked) {
-                updateData.likedBy = { set: likedBy.filter(id => id !== userId) };
+                updateData.likedBy = { disconnect: userConnect };
             }
 
-            // 2. If user ID is in dislikedBy, remove it (UNDISLIKE). Else, add it (DISLIKE).
+            // 2. If user ID is in dislikedBy, remove it (UNDISLIKE - DISCONNECT). Else, add it (DISLIKE - CONNECT).
             if (currentlyDisliked) {
-                updateData.dislikedBy = { set: dislikedBy.filter(id => id !== userId) }; // Remove (Undislike)
+                updateData.dislikedBy = { disconnect: userConnect };
             } else {
-                updateData.dislikedBy = { push: userId }; // Add (Dislike)
+                updateData.dislikedBy = { connect: userConnect };
             }
         }
         
-        // 3. Perform the update
+        // 3. Perform the update and retrieve the new lists of IDs
         const updatedPost = await tx.post.update({
             where: { id: postId },
             data: updateData,
-            select: { likedBy: true, dislikedBy: true, authorId: true }
+            select: { 
+                likedBy: { select: { id: true } }, 
+                dislikedBy: { select: { id: true } }, 
+                authorId: true 
+            }
         });
         
         return { 
-            likedBy: updatedPost.likedBy, 
-            dislikedBy: updatedPost.dislikedBy, 
+            likedBy: updatedPost.likedBy.map(u => u.id), 
+            dislikedBy: updatedPost.dislikedBy.map(u => u.id), 
             authorId: updatedPost.authorId,
             notificationNeeded
         };
     });
     
-    // Side Effects (Outside the transaction for non-blocking nature)
+    // Side Effects (Outside the transaction)
     if (result.notificationNeeded) {
         // Side Effects: Queue 'like' notification
         await queueJob('SEND_NOTIFICATION', {
@@ -648,6 +662,7 @@ const toggleVote = async (
         });
     }
 
+    // Return the final string arrays of IDs
     return { likedBy: result.likedBy, dislikedBy: result.dislikedBy };
 };
 
