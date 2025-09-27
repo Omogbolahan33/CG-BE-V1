@@ -422,3 +422,47 @@ export const dislikeComment = async (
 
     return toggleCommentVote(commentId, currentAuthUserId, false); // false = isDislikeAction
 };
+
+
+/**
+ * Service: Flag Comment
+ * @description Adds a flag to a comment for moderator review.
+ * @coreLogic Connects the current user to the comment's 'flaggedBy' relation.
+ */
+export const flagComment = async (
+    postId: string, 
+    commentId: string, 
+    currentAuthUserId: string
+): Promise<{ success: boolean }> => {
+    
+    // Define the User object for the connect operation
+    const userConnect = { id: currentAuthUserId };
+
+    // 1. Check if the comment exists and belongs to the post
+    const commentExists = await prisma.comment.findUnique({
+        where: { id: commentId },
+        select: { postId: true }
+    });
+
+    if (!commentExists) {
+        throw new NotFoundError('Comment not found.');
+    }
+    
+    // Check if the comment belongs to the post specified in the path
+    if (commentExists.postId !== postId) {
+        throw new NotFoundError('Comment does not belong to the specified post.');
+    }
+
+    // 2. Core Logic: Atomically add the user's ID to the comment's flaggedBy relation
+    // We use 'connect' on the relational field. If the user already flagged it, Prisma ignores the command.
+    await prisma.comment.update({
+        where: { id: commentId },
+        data: {
+            flaggedBy: {
+                connect: userConnect // Adds the user ID to the flaggedBy relation
+            },
+        },
+    });
+
+    return { success: true };
+};
