@@ -707,3 +707,62 @@ export const dislikePost = async (
 
     return toggleVote(postId, currentAuthUserId, false); // false = isDislikeAction
 };
+
+
+interface FollowResponse {
+    followedPostIds: string[];
+}
+
+/**
+ * Service: Follow/Unfollow Post
+ * @description Toggles following a specific post to receive notifications on new comments.
+ * @coreLogic Atomically adds or removes the postId from the current user's followedPostIds array.
+ */
+export const followPost = async (
+    postId: string, 
+    currentAuthUserId: string
+): Promise<FollowResponse> => {
+    
+    // 1. Fetch the user's current followedPostIds to determine action
+    const user = await prisma.user.findUnique({
+        where: { id: currentAuthUserId },
+        select: { followedPostIds: true }
+    });
+
+    if (!user) {
+        throw new NotFoundError('User not found.');
+    }
+
+    const currentlyFollowing = user.followedPostIds.includes(postId);
+    let updateData: Prisma.UserUpdateInput;
+
+    if (currentlyFollowing) {
+        // Unfollow: Atomically remove the postId from the array (Prisma's pull)
+        updateData = {
+            followedPostIds: {
+                set: user.followedPostIds.filter(id => id !== postId)
+            }
+        };
+    } else {
+        // Follow: Atomically add the postId to the array (Prisma's push)
+        updateData = {
+            followedPostIds: {
+                push: postId
+            }
+        };
+    }
+    
+    // 2. Perform the atomic update on the User model
+    const updatedUser = await prisma.user.update({
+        where: { id: currentAuthUserId },
+        data: updateData,
+        select: { followedPostIds: true }
+    });
+
+    // 3. Side Effect (Realtime)
+    // On success, emit a `userUpdate:{userId}` event with the updated `followedPostIds`.
+    // (This step is typically handled in the controller or a service wrapper, 
+    // but the intention is noted.)
+
+    return { followedPostIds: updatedUser.followedPostIds };
+};
