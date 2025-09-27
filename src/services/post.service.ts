@@ -544,3 +544,151 @@ export const deletePost = async (
 
     return { success: true };
 };
+
+
+
+
+interface LikeDislikeResponse {
+    likedBy: string[];
+    dislikedBy: string[];
+}
+
+
+
+
+
+/**
+ * Executes the atomic update logic for liking or disliking a post.
+ * @param postId The ID of the post to update.
+ * @param userId The ID of the user performing the action.
+ * @param isLikeAction True for Like, False for Dislike.
+ * @returns The updated likedBy and dislikedBy arrays.
+ */
+const toggleVote = async (
+    postId: string, 
+    userId: string, 
+    isLikeAction: boolean
+): Promise<LikeDislikeResponse> => {
+    
+    // We use a transaction to ensure atomicity for the read-modify-write cycle.
+    const result = await prisma.$transaction(async (tx) => {
+        // 1. Fetch the current state of the post
+        const post = await tx.post.findUnique({
+            where: { id: postId },
+            select: { likedBy: true, dislikedBy: true, authorId: true }
+        });
+
+        if (!post) {
+            throw new NotFoundError('Post not found.');
+        }
+
+        const { likedBy, dislikedBy } = post;
+        const currentlyLiked = likedBy.includes(userId);
+        const currentlyDisliked = dislikedBy.includes(userId);
+        
+        let updateData: Prisma.PostUpdateInput = {
+            lastActivityTimestamp: new Date(), // Core Logic 3: Update timestamp
+        };
+        let notificationNeeded = false;
+
+        if (isLikeAction) {
+            // Logic for LIKE Post
+            
+            // 1. If user ID is in dislikedBy, remove it.
+            if (currentlyDisliked) {
+                updateData.dislikedBy = { set: dislikedBy.filter(id => id !== userId) };
+            }
+
+            // 2. If user ID is in likedBy, remove it (UNLIKE). Else, add it (LIKE).
+            if (currentlyLiked) {
+                updateData.likedBy = { set: likedBy.filter(id => id !== userId) }; // Remove (Unlike)
+            } else {
+                updateData.likedBy = { push: userId }; // Add (Like)
+                notificationNeeded = (post.authorId !== userId); // Side Effect check
+            }
+
+        } else {
+            // Logic for DISLIKE Post
+
+            // 1. If user ID is in likedBy, remove it.
+            if (currentlyLiked) {
+                updateData.likedBy = { set: likedBy.filter(id => id !== userId) };
+            }
+
+            // 2. If user ID is in dislikedBy, remove it (UNDISLIKE). Else, add it (DISLIKE).
+            if (currentlyDisliked) {
+                updateData.dislikedBy = { set: dislikedBy.filter(id => id !== userId) }; // Remove (Undislike)
+            } else {
+                updateData.dislikedBy = { push: userId }; // Add (Dislike)
+            }
+        }
+        
+        // 3. Perform the update
+        const updatedPost = await tx.post.update({
+            where: { id: postId },
+            data: updateData,
+            select: { likedBy: true, dislikedBy: true, authorId: true }
+        });
+        
+        return { 
+            likedBy: updatedPost.likedBy, 
+            dislikedBy: updatedPost.dislikedBy, 
+            authorId: updatedPost.authorId,
+            notificationNeeded
+        };
+    });
+    
+    // Side Effects (Outside the transaction for non-blocking nature)
+    if (result.notificationNeeded) {
+        // Side Effects: Queue 'like' notification
+        await queueJob('SEND_NOTIFICATION', {
+            type: 'POST_LIKED',
+            recipientId: result.authorId,
+            details: { postId, likerId: userId }
+        });
+    }
+
+    return { likedBy: result.likedBy, dislikedBy: result.dislikedBy };
+};
+
+// --- Main Service Functions ---
+
+/**
+ * Toggles a like on a post.
+ */
+export const likePost = async (
+    postId: string, 
+    currentAuthUserId: string,
+    currentUserRole: AuthUser['role'] // Assuming role is available on AuthUser
+): Promise<LikeDislikeResponse> => {
+    
+    // Pre-conditions: Check Backoffice setting `enableLikes`
+    const settings = await getBackofficeSettings();
+    const canLike = currentUserRole !== 'Member' || settings.enableLikes; 
+    
+    if (!canLike) {
+        throw new ForbiddenError('Liking posts is currently disabled.');
+    }
+
+    return toggleVote(postId, currentAuthUserId, true); // true = isLikeAction
+};
+
+/**
+ * Toggles a dislike on a post.
+ */
+export const dislikePost = async (
+    postId: string, 
+    currentAuthUserId: string,
+    currentUserRole: AuthUser['role']
+): Promise<LikeDislikeResponse> => {
+    
+    // Pre-conditions: Check Backoffice setting `enableLikes`
+    const settings = await getBackofficeSettings();
+    const canDislike = currentUserRole !== 'Member' || settings.enableLikes; 
+    
+    if (!canDislike) {
+        throw new ForbiddenError('Disliking posts is currently disabled.');
+    }
+
+    return toggleVote(postId, currentAuthUserId, false); // false = isDislikeAction
+};
