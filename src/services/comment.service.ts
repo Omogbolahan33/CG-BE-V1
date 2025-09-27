@@ -143,3 +143,59 @@ export const addComment = async (
 
     return newComment;
 };
+
+
+
+
+
+/**
+ * API: Edit Comment
+ * @description Edits an existing comment.
+ * @authorization User must be the author of the comment.
+ */
+export const editComment = async (
+    postId: string, 
+    commentId: string, 
+    newContent: string,
+    currentAuthUserId: string
+): Promise<Comment> => {
+    
+    // 1. Fetch the comment and check existence/authorization
+    const commentToEdit = await prisma.comment.findUnique({ 
+        where: { id: commentId },
+        select: { 
+            id: true, 
+            authorId: true, 
+            postId: true, 
+        }
+    });
+
+    if (!commentToEdit) {
+        throw new NotFoundError('Comment not found.');
+    }
+
+    // Authorization: User must be the author
+    if (commentToEdit.authorId !== currentAuthUserId) {
+        throw new ForbiddenError('You do not have permission to edit this comment.');
+    }
+
+    // Pre-condition: Comment must belong to the correct post (for robust path validation)
+    if (commentToEdit.postId !== postId) {
+        // This indicates an incorrect URL usage, though 404/403 are both acceptable here.
+        throw new NotFoundError('Comment does not belong to the specified post.');
+    }
+
+    // 2. Security: Sanitize new content
+    const sanitizedContent = sanitizeCommentContent(newContent);
+
+    // 3. Core Logic: Update content and set editedAt timestamp
+    const updatedComment = await prisma.comment.update({ 
+        where: { id: commentId },
+        data: {
+            content: sanitizedContent,
+            editedAt: new Date(), // Set the edited timestamp
+        },
+    }) as unknown as Comment; // Cast to your simple Comment type
+
+    return updatedComment;
+};
