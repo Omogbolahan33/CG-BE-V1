@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { getPosts, GetPostsFilters } from '../../../services/post.service'; 
+import { GetPostsFilters } from '../../../types';
+import { getPosts } from '../../../services/post.service'; 
 
 /**
  * API: Get Posts
