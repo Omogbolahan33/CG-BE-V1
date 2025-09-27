@@ -18,6 +18,9 @@ v1Router.use('/auth', authRoutes);
 // Mounts all routes from user.routes.ts under the path /api/v1/users
 // This makes the endpoint: GET /api/v1/users/me
 v1Router.use('/users', userRouter);
+
+// POST ROUTES
+// Mounts all routes from user.routes.ts under the path /api/v1/posts
 v1Router.use('/posts', postRoutes);
 
 export default v1Router;
