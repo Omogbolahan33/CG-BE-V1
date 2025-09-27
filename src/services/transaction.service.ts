@@ -48,7 +48,7 @@ export const createTransaction = async (
     
     // 1. Fetch Post, Buyer, and Settings atomically
     const [post, buyer, settings, admins] = await Promise.all([
-        // ... (Post, Buyer, Settings fetching logic remains the same) ...
+        // 1. Fetch Post, Buyer (current user), and Settings atomically
         prisma.post.findUnique({
             where: { id: postId },
             select: { 
@@ -56,7 +56,7 @@ export const createTransaction = async (
                 authorId: true, 
                 price: true, 
                 isSoldOut: true, 
-                title: true,
+                title: true, // Needed for notification context
             }
         }),
         prisma.user.findUnique({
@@ -66,7 +66,7 @@ export const createTransaction = async (
                 address: true, 
                 city: true, 
                 zipCode: true,
-                email: true
+                email: true // Optional: for payment system
             }
         }),
         getBackofficeSettings(),
@@ -81,28 +81,31 @@ export const createTransaction = async (
     }
     
     // --- 2. Pre-conditions Check (Authorization, Sold Out, Self-Purchase, Address) ---
-    // ... (All pre-conditions logic remains the same) ...
+    // 2.1. Backoffice setting check
     const enablePayments = settings.enablePayments;
     const canPay = currentUserRole !== UserRole.Member || enablePayments;
     
     if (!canPay) {
         throw new ForbiddenError('Payments are currently disabled.');
     }
+    // 2.2. Post must not be sold out
     if (post.isSoldOut) {
         throw new BadRequestError('This item is already sold out.');
     }
+    // 2.3. Buyer cannot be the seller
     if (post.authorId === currentAuthUserId) {
         throw new BadRequestError('You cannot purchase your own item.');
     }
+    // 2.4. Buyer must have shipping address set
     if (!buyer.address || !buyer.city || !buyer.zipCode) {
         throw new BadRequestError('Please complete your shipping address before proceeding with a purchase.');
     }
 
     // --- 3. Payment Processing (External Call) ---
     const itemPrice = post.price || 0;
-    const totalAmount = itemPrice + deliveryFee;
+    const totalAmount = itemPrice + deliveryFee; //platform fee not included yet.
 
-    // ✅ FIX: Call the external utility
+    // Call the external utility
     const paymentResult = await processPayment(totalAmount); 
     
     let transactionStatus: TransactionStatus;
@@ -129,20 +132,24 @@ export const createTransaction = async (
                 break;
         }
 
-        const createdTransaction = await tx.transaction.create({
-            data: {
-                post: { connect: { id: postId } },
-                buyer: { connect: { id: currentAuthUserId } },
-                seller: { connect: { id: post.authorId } },
-                itemPrice: itemPrice,
-                deliveryFee: deliveryFee,
-                totalAmount: totalAmount,
-                status: transactionStatus, // Use determined status
-                paymentReference: paymentResult.reference,
-                failureReason: paymentResult.failureReason,
-                shippingAddress: `${buyer.address}, ${buyer.city}, ${buyer.zipCode}`,
-            } as Prisma.TransactionCreateInput
-        }) as unknown as Transaction;
+        const transactionCreateData = {
+            // ✅ FIX: Use full connect objects for relational fields
+            post: { connect: { id: postId } }, 
+            buyer: { connect: { id: currentAuthUserId } }, 
+            seller: { connect: { id: post.authorId } }, 
+            
+            itemPrice: itemPrice,
+            deliveryFee: deliveryFee,
+            totalAmount: totalAmount,
+            status: transactionStatus, // Use determined enum status
+            paymentReference: paymentResult.reference,
+            failureReason: paymentResult.failureReason,
+            shippingAddress: `${buyer.address}, ${buyer.city}, ${buyer.zipCode}`,
+
+        
+            const createdTransaction = await tx.transaction.create({
+                data: transactionCreateData as unknown as Prisma.TransactionCreateInput
+            }) as unknown as Transaction;
         
         return createdTransaction;
     });
