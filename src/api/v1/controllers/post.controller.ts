@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { GetPostsFilters } from '../../../types';
-import { getPosts, getPostDetails } from '../../../services/post.service'; 
+import { GetPostsFilters, AuthUser, CreatePostPayload } from '../../../types';
+import { getPosts, getPostDetails, createPost  } from '../../../services/post.service'; 
+import { ForbiddenError } from '../../../errors/ForbiddenError';
 
 /**
  * API: Get Posts
@@ -61,5 +62,35 @@ export const getPostDetailsController = async (req: Request, res: Response, next
 
     } catch (error) {
         next(error);
+    }
+};
+
+
+/**
+ * API: Create Post
+ * @description Handles the request to create a new post using the authenticated user context.
+ */
+export const createPostController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        // 🔥 Get the full AuthUser object from req.user (provided by middleware)
+        const authUser = req.user as AuthUser; 
+        
+        // This failsafe check should never be hit if middleware is working, but it's good practice
+        if (!authUser || !authUser.id) {
+            throw new ForbiddenError("Authentication context missing.", 401);
+        }
+
+        const postData: CreatePostPayload = req.body;
+        
+        const createdPost = await createPost(postData, authUser);
+
+        return res.status(201).json({
+            status: 'success',
+            message: 'Post created successfully.',
+            data: createdPost,
+        });
+
+    } catch (error) {
+        next(error); 
     }
 };
