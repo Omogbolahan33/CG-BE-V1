@@ -16,7 +16,7 @@ export const getTransactions = async (currentAuthUserId: string): Promise<Transa
             ],
         },
         orderBy: {
-            timestamp: 'desc', // Typically, transactions are ordered by newest first
+            date: 'desc', // Typically, transactions are ordered by newest first
         },
         // Include relevant relations if needed, e.g., include: { post: true, buyer: true, seller: true }
     }) as unknown as Transaction[]; // Cast to your simple Transaction type
