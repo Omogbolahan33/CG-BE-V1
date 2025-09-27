@@ -2,12 +2,8 @@
 
 import prisma from './prisma';
 import { BackofficeSettings } from '@prisma/client'; // Import the base model type
+import { EssentialBackofficeSettings } from '../types'; 
 
-// Define the partial type we care about for the Post service
-export interface EssentialBackofficeSettings {
-    enablePostCreation: boolean;
-    enableAdvertisements: boolean;
-}
 
 // A simple in-memory cache to reduce database load for frequently accessed settings
 let settingsCache: EssentialBackofficeSettings | null = null;
