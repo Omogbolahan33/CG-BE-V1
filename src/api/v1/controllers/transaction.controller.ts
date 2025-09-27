@@ -69,39 +69,56 @@ export const createTransactionController = async (req: AuthRequest, res: Respons
 
 /**
  * Controller: Update Transaction Status
+ * Handles updates to transaction status, tracking number, and shipping proof.
  */
 export const updateTransactionController = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const transactionId = req.params.transactionId;
-        // status and trackingNumber come from the JSON body
-        const { status, trackingNumber } = req.body; 
-        // proofOfShipment comes from the file upload middleware (req.file or similar)
-        const proofOfShipment = req.file; 
+        const { transactionId } = req.params;
+        const { status, trackingNumber } = req.body;
         
-        const currentAuthUserId = req.userId;
-        const currentUserRole = req.userRole;
+        // File is attached by Multer middleware
+        const proofOfShipment = req.file;
+        
+        const { userId: currentAuthUserId, userRole: currentUserRole } = req;
 
+        // --- Authentication & Input Checks ---
         if (!currentAuthUserId || !currentUserRole) {
             return res.status(403).json({ message: 'Authentication required.' });
         }
-        
-        // Pass only the fields that were actually provided in the request
-        const updates = { 
-            status: status, 
-            trackingNumber: trackingNumber, 
-            proofOfShipment: proofOfShipment 
-        };
+        if (!transactionId) {
+             // Use your custom error if available, or throw a standard Error
+             throw new Error('Transaction ID is required.'); 
+        }
 
+        // --- Construct Update Payload ---
+        // Build the updates object, including only fields that are actually present.
+        const updates = Object.assign(
+            {},
+            status && { status },
+            trackingNumber && { trackingNumber },
+            proofOfShipment && { proofOfShipment } // Pass the file object/buffer
+        );
+        
+        // If no valid update fields were provided, the service layer will likely catch it,
+        // but a quick check here is also fine.
+        if (Object.keys(updates).length === 0) {
+            throw new BadRequestError('No valid update fields provided.');
+        }
+
+
+        // --- Service Call ---
         const updatedTransaction = await updateTransaction(
-            transactionId, 
-            updates, 
+            transactionId,
+            updates,
             currentAuthUserId,
             currentUserRole
         );
 
+        // --- Response ---
         return res.status(200).json(updatedTransaction);
 
-    } catch (error: any) {
+    } catch (error) {
+        // Pass the error to the global error handler middleware
         next(error);
     }
 };
