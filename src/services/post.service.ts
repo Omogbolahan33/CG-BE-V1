@@ -71,8 +71,8 @@ export const getPosts = async (filters: GetPostsFilters): Promise<{ posts: Post[
     };
 
     let orderBy: Prisma.PostOrderByWithRelationInput = {};
-    let fetchedPosts: Post[];
-    let total: number;
+    let fetchedPosts: Post[] = []; 
+    let total: number = 0; 
     let shouldQueryFromDB = true; // Flag for standard DB query path
 
     // --- 3. Sorting Logic (Custom Logic vs. DB Logic) ---
