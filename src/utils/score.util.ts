@@ -2,10 +2,10 @@
  * Calculates a sophisticated trending score for a post based on engagement and time decay.
  * @param likesCount Number of likes.
  * @param commentsCount Number of comments.
- * @param createdAt The time the post was created (Date object).
+ * @param timestamp The time the post was created (Date object).
  * @returns The final trending score (number).
  */
-export const calculateTrendingScore = (likesCount: number, commentsCount: number, createdAt: Date): number => {
+export const calculateTrendingScore = (likesCount: number, commentsCount: number, timestamp: Date): number => {
     
     // Constants from Business Logic
     const GRAVITY = 1.5;
@@ -14,7 +14,7 @@ export const calculateTrendingScore = (likesCount: number, commentsCount: number
     
     const now = new Date();
     // Time Since Post in hours, capped at a minimum to prevent division by zero or negative time.
-    const timeSincePostHours = Math.max(0.1, (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60));
+    const timeSincePostHours = Math.max(0.1, (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60));
 
     // 1. Engagement Score = (Likes * 1) + (Comments * 2)
     const engagementScore = (likesCount * 1) + (commentsCount * COMMENT_WEIGHT);
