@@ -4,8 +4,10 @@ import prisma from '../utils/prisma';
 import { Prisma } from '@prisma/client'; 
 import { calculateTrendingScore } from '../utils/score.util';
 import { sanitizePostContent } from '../utils/sanitize-html'; // <-- Correct, singular import of wrapper
+import { nestComments, NestedComment } from '../utils/comment-nesting.util';
 import { BadRequestError } from '../errors/BadRequestError'; // <-- Required for input validation
-import { Post, GetPostsFilters } from '../types'; 
+import { NotFoundError } from '../errors/NotFoundError';
+import { Post, GetPostsFilters, Comment } from '../types'; 
 
 /**
  * Defines the minimum required fields from the Post model for fetching.
@@ -189,4 +191,92 @@ export const getPosts = async (filters: GetPostsFilters): Promise<{ posts: Post[
     })) as Post[]; 
     
     return { posts: sanitizedPosts, total };
+};
+
+
+
+/**
+ * API: Get Post Details
+ * @description Fetches a single post with its full comment hierarchy.
+ */
+export const getPostDetails = async (postId: string): Promise<Post> => {
+    
+    // 1. Fetch the Post and all its related comments
+    const post = await prisma.post.findUnique({
+        where: { id: postId },
+        // Select all required post details and include all comments
+        select: {
+            // Include all fields required by your local Post type
+            id: true,
+            title: true, 
+            content: true,
+            timestamp: true, 
+            lastActivityTimestamp: true, 
+            isAdvert: true, 
+            isSoldOut: true, 
+            isCommentingRestricted: true, 
+            price: true,
+            pinnedAt: true,
+            authorId: true,
+            categoryId: true,
+            
+            // Include related data
+            author: { select: { id: true, username: true } },
+            category: { select: { id: true, name: true } },
+            
+            // Include all comments (flat list)
+            comments: {
+                orderBy: { timestamp: 'asc' }, // Order by creation time
+                select: {
+                    id: true,
+                    content: true,
+                    timestamp: true,
+                    parentId: true, // Crucial for nesting
+                    // Include comment author details
+                    author: { select: { id: true, username: true } },
+                    // Include necessary counts (likes, etc.)
+                    // ...
+                }
+            },
+            // Note: likesCount/commentsCount are usually fetched separately or via middleware 
+        }
+    }) as (Post & { comments: Comment[] }) | null;
+
+
+    // 2. Error Handling
+    if (!post) {
+        // @errorHandling: 404 Not Found
+        throw new NotFoundError(`Post with ID ${postId} not found.`);
+    }
+
+    // 3. Security & Sanitization
+    // Sanitize the main post content
+    const sanitizedPostContent = sanitizePostContent(post.content);
+
+    // Sanitize all comment content
+    const sanitizedComments = post.comments.map(comment => ({
+        ...comment,
+        content: sanitizePostContent(comment.content)
+    })) as Comment[];
+    
+    
+    // 4. Business Logic: Nest Comments
+    const nestedComments = nestComments(sanitizedComments);
+    
+    
+    // 5. Final Structure Assembly
+    // Note: The final returned Post object should match the Post schema.
+    // Assuming your 'Post' type requires comments to be nested:
+    const finalPost: Post = {
+        ...post,
+        content: sanitizedPostContent,
+        // The 'comments' field on the final Post object is assumed to be the nested structure
+        comments: nestedComments as any, // Cast to any to handle nested type complexity
+    } as any; 
+
+    // Remove the computed counts for this specific detail view if they don't belong here
+    delete (finalPost as any).likesCount;
+    delete (finalPost as any).commentsCount;
+
+    return finalPost;
 };
