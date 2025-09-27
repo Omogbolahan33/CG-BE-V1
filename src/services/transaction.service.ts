@@ -133,26 +133,26 @@ export const createTransaction = async (
         }
 
         const transactionCreateData = {
-            // ✅ FIX: Use full connect objects for relational fields
-            post: { connect: { id: postId } }, 
-            buyer: { connect: { id: currentAuthUserId } }, 
-            seller: { connect: { id: post.authorId } }, 
-            
-            itemPrice: itemPrice,
-            deliveryFee: deliveryFee,
-            totalAmount: totalAmount,
-            status: transactionStatus, // Use determined enum status
-            paymentReference: paymentResult.reference,
-            failureReason: paymentResult.failureReason,
-            shippingAddress: `${buyer.address}, ${buyer.city}, ${buyer.zipCode}`,
-
+                // ✅ FIX: Use full connect objects for relational fields
+                post: { connect: { id: postId } }, 
+                buyer: { connect: { id: currentAuthUserId } }, 
+                seller: { connect: { id: post.authorId } }, 
+                
+                itemPrice: itemPrice,
+                deliveryFee: deliveryFee,
+                totalAmount: totalAmount,
+                status: transactionStatus, // Use determined enum status
+                paymentReference: paymentResult.reference,
+                failureReason: paymentResult.failureReason,
+                shippingAddress: `${buyer.address}, ${buyer.city}, ${buyer.zipCode}`,
+    
+        };
+                const createdTransaction = await tx.transaction.create({
+                    data: transactionCreateData as unknown as Prisma.TransactionCreateInput
+                }) as unknown as Transaction;
         
-            const createdTransaction = await tx.transaction.create({
-                data: transactionCreateData as unknown as Prisma.TransactionCreateInput
-            }) as unknown as Transaction;
-        
-        return createdTransaction;
-    });
+            return createdTransaction;
+        });
 
     // --- 5. Side Effects (Notifications & Realtime) ---
     // ... (Notification logic remains largely the same, but adapts to PENDING status) ...
