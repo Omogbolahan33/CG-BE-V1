@@ -5,8 +5,9 @@ import IORedis from 'ioredis';
 
 // Concrete production configuration (requires environment variables)
 const REDIS_CONNECTION = new IORedis({ 
-    host: process.env.REDIS_HOST || 'localhost',
+    host: process.env.REDIS_HOST,
     port: parseInt(process.env.REDIS_PORT || '6379'),
+    username: process.env.REDIS_USERNAME || 'default',
     password: process.env.REDIS_PASSWORD,
     maxRetriesPerRequest: null,
     
