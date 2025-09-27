@@ -252,3 +252,173 @@ export const deleteComment = async (
     
     return { success: true };
 };
+
+
+
+
+
+/**
+ * API: Like/Dislike Comment
+ * @description Deletes a comment.
+ * @authorization User must be the author or an Admin/Super Admin.
+ */
+
+
+
+interface LikeDislikeResponse {
+    likedBy: string[];
+    dislikedBy: string[];
+}
+
+/**
+ * Executes the atomic update logic for liking or disliking a comment.
+ */
+const toggleCommentVote = async (
+    commentId: string, 
+    userId: string, 
+    isLikeAction: boolean
+): Promise<LikeDislikeResponse> => {
+    
+    // We use a transaction to ensure atomicity for the read-modify-write cycle.
+    const result = await prisma.$transaction(async (tx) => {
+        // 1. Fetch the current state of the comment
+        const comment = await tx.comment.findUnique({
+            where: { id: commentId },
+            select: { 
+                likedBy: { select: { id: true } }, 
+                dislikedBy: { select: { id: true } }, 
+                authorId: true,
+                postId: true // Need postId for the realtime event
+            }
+        });
+
+        if (!comment) {
+            throw new NotFoundError('Comment not found.');
+        }
+
+        // Convert relations to simple ID arrays for logic checks
+        const likedByIds = comment.likedBy.map(u => u.id);
+        const dislikedByIds = comment.dislikedBy.map(u => u.id);
+        
+        const currentlyLiked = likedByIds.includes(userId);
+        const currentlyDisliked = dislikedByIds.includes(userId);
+        
+        let updateData: Prisma.CommentUpdateInput = {};
+        let notificationNeeded = false;
+
+        const userConnect = { id: userId }; 
+
+        if (isLikeAction) {
+            // Logic for LIKE Comment
+            
+            // 1. If user ID is in dislikedBy, remove it (DISCONNECT).
+            if (currentlyDisliked) {
+                updateData.dislikedBy = { disconnect: userConnect };
+            }
+
+            // 2. If user ID is in likedBy, remove it (UNLIKE - DISCONNECT). Else, add it (LIKE - CONNECT).
+            if (currentlyLiked) {
+                updateData.likedBy = { disconnect: userConnect };
+            } else {
+                updateData.likedBy = { connect: userConnect };
+                // Side Effect check: If a LIKE was ADDED and it's not a self-like
+                notificationNeeded = (comment.authorId !== userId); 
+            }
+
+        } else {
+            // Logic for DISLIKE Comment
+
+            // 1. If user ID is in likedBy, remove it (DISCONNECT).
+            if (currentlyLiked) {
+                updateData.likedBy = { disconnect: userConnect };
+            }
+
+            // 2. If user ID is in dislikedBy, remove it (UNDISLIKE - DISCONNECT). Else, add it (DISLIKE - CONNECT).
+            if (currentlyDisliked) {
+                updateData.dislikedBy = { disconnect: userConnect };
+            } else {
+                updateData.dislikedBy = { connect: userConnect };
+            }
+        }
+        
+        // 3. Perform the update and retrieve the new lists of IDs
+        const updatedComment = await tx.comment.update({
+            where: { id: commentId },
+            data: updateData,
+            select: { 
+                likedBy: { select: { id: true } }, 
+                dislikedBy: { select: { id: true } }, 
+                authorId: true,
+                postId: true
+            }
+        });
+        
+        return { 
+            likedBy: updatedComment.likedBy.map(u => u.id), 
+            dislikedBy: updatedComment.dislikedBy.map(u => u.id), 
+            authorId: updatedComment.authorId,
+            postId: updatedComment.postId,
+            notificationNeeded
+        };
+    });
+    
+    // Side Effects (Outside the transaction)
+    if (result.notificationNeeded) {
+        // Side Effects: Queue 'comment_like' notification
+        await queueJob('SEND_NOTIFICATION', {
+            type: 'COMMENT_LIKED', // Assuming the type is COMMENT_LIKED or similar
+            recipientId: result.authorId,
+            details: { 
+                postId: result.postId, 
+                commentId: commentId, 
+                likerId: userId 
+            }
+        });
+    }
+
+    return { likedBy: result.likedBy, dislikedBy: result.dislikedBy };
+};
+
+// --- Main Service Functions ---
+
+/**
+ * Toggles a like on a comment.
+ */
+export const likeComment = async (
+    postId: string, // Not strictly used for DB logic, but passed for route consistency
+    commentId: string, 
+    currentAuthUserId: string,
+    currentUserRole: UserRole
+): Promise<LikeDislikeResponse> => {
+    
+    // Pre-conditions: Check Backoffice setting `enableLikes`
+    const settings = await getBackofficeSettings();
+    const canLike = currentUserRole !== UserRole.Member || settings.enableLikes; 
+    
+    if (!canLike) {
+        throw new ForbiddenError('Liking/disliking is currently disabled.');
+    }
+
+    return toggleCommentVote(commentId, currentAuthUserId, true); // true = isLikeAction
+};
+
+/**
+ * Toggles a dislike on a comment.
+ */
+export const dislikeComment = async (
+    postId: string, 
+    commentId: string, 
+    currentAuthUserId: string,
+    currentUserRole: UserRole
+): Promise<LikeDislikeResponse> => {
+    
+    // Pre-conditions: Check Backoffice setting `enableLikes`
+    const settings = await getBackofficeSettings();
+    const canDislike = currentUserRole !== UserRole.Member || settings.enableLikes; 
+    
+    if (!canDislike) {
+        throw new ForbiddenError('Liking/disliking is currently disabled.');
+    }
+
+    return toggleCommentVote(commentId, currentAuthUserId, false); // false = isDislikeAction
+};
