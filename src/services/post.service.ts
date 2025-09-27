@@ -831,3 +831,58 @@ export const flagPost = async (
 
     return { success: true };
 };
+
+
+
+
+
+/**
+ * Service: Toggle Post Sold Out Status
+ * @description Manually toggles the 'isSoldOut' status of an advertisement.
+ */
+export const toggleSoldOutStatus = async (
+    postId: string, 
+    currentAuthUserId: string
+): Promise<Post> => {
+    
+    // 1. Find the post and select fields needed for checks
+    const currentPost = await prisma.post.findUnique({ 
+        where: { id: postId },
+        select: { 
+            id: true, 
+            authorId: true, 
+            isAdvert: true, 
+            isSoldOut: true 
+        }
+    });
+
+    if (!currentPost) {
+        throw new NotFoundError('Post not found.');
+    }
+
+    // 2. Authorization and Pre-condition Check
+    
+    // Authorization: User must be the author
+    if (currentPost.authorId !== currentAuthUserId) {
+        throw new ForbiddenError('You do not have permission to modify this post.');
+    }
+    
+    // Pre-condition: Post must be an advert
+    if (currentPost.isAdvert !== true) {
+        // We use ForbiddenError here as specified, though BadRequestError would also be acceptable
+        throw new ForbiddenError('Only advertisements can have their sold out status toggled.');
+    }
+
+    // 3. Core Logic: Toggle the boolean value of the isSoldOut field.
+    const newIsSoldOutStatus = !currentPost.isSoldOut;
+
+    // 4. Save and return the updated post object.
+    const updatedPost = await prisma.post.update({ 
+        where: { id: postId },
+        data: {
+            isSoldOut: newIsSoldOutStatus
+        },
+    }) as unknown as Post; // Cast to your simple Post type
+
+    return updatedPost;
+};
