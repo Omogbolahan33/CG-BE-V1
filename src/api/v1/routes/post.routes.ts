@@ -6,7 +6,8 @@ import { getPostsController,
         deletePostController, 
         likePostController, 
         dislikePostController, 
-        followPostController, flagPostController } from '../controllers/post.controller';
+        followPostController, 
+        flagPostController, toggleSoldOutStatusController } from '../controllers/post.controller';
 import { authMiddleware } from '../../../middlewares/auth.middleware';
 
 const router = Router();
@@ -45,5 +46,9 @@ router.post('/:postId/follow', authMiddleware, followPostController);
 //   FLAG POST
 // Endpoint: POST /api/v1/posts/:postId/flag
 router.post('/:postId/flag', authMiddleware, flagPostController); 
+
+//  TOGGLE SOLD OUT STATUS
+// Endpoint: POST /api/v1/posts/:postId/toggle-sold
+router.post('/:postId/toggle-sold', authMiddleware, toggleSoldOutStatusController); 
 
 export default router;
