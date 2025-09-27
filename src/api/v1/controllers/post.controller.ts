@@ -6,7 +6,7 @@ import { getPosts,
         createPost, 
         updatePost, 
         deletePost, 
-        likePost, dislikePost } from '../../../services/post.service'; 
+        likePost, dislikePost, followPost } from '../../../services/post.service'; 
 import { ForbiddenError } from '../../../errors/ForbiddenError';
 
 /**
@@ -234,6 +234,29 @@ export const dislikePostController = async (req: AuthRequest, res: Response, nex
         // Realtime: Emit event on success
         // io.emit(`postUpdate:${postId}`, result); 
 
+        return res.status(200).json(result);
+
+    } catch (error: any) {
+        next(error);
+    }
+};
+
+// --- Follow/Unfollow Post Controller ---
+export const followPostController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const postId = req.params.postId;
+        const currentAuthUserId = req.userId; 
+        
+        if (!currentAuthUserId) {
+            return res.status(403).json({ message: 'Authentication required.' });
+        }
+
+        const result = await followPost(postId, currentAuthUserId);
+
+        // Realtime: Emit user update event here
+        // io.emit(`userUpdate:${currentAuthUserId}`, { followedPostIds: result.followedPostIds });
+
+        // Success response
         return res.status(200).json(result);
 
     } catch (error: any) {
