@@ -7,7 +7,7 @@ import { Router } from 'express';
 import authRoutes from './auth.route'; 
 import userRouter from './user.routes'; 
 import postRoutes from './post.routes';
-import commentRoutes from './comment.routes';
+import commentRouter from './comment.routes';
 
 const v1Router = Router();
 
@@ -26,6 +26,6 @@ v1Router.use('/posts', postRoutes);
 
 // COMMENT ROUTES
 // Mounts all routes from user.routes.ts under the path /api/v1/posts
-v1Router.use('/comments', commentRoutes);
+v1Router.use('/:postId/comments', commentRouter);
 
 export default v1Router;
