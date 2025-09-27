@@ -163,4 +163,14 @@ export interface CreatePostPayload {
 export interface EssentialBackofficeSettings {
     enablePostCreation: boolean;
     enableAdvertisements: boolean;
+    maintenanceMode:      Boolean;
+    enablePayments:       Boolean;
+    enableSignups:        Boolean;
+    enableLogins:         Boolean;
+    enableCommenting:     Boolean;
+    enableLikes:          Boolean;
+    enableFollowing:      Boolean;
+    enableChats:          Boolean;
+    enableCalling:        Boolean;
+    enableDisputes       Boolean;
 }
