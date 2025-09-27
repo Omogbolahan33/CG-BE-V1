@@ -6,7 +6,8 @@ import { User as PrismaUser,
         BankAccount as PrismaBankAccount, 
         NotificationType as PrismaNotificationType,
         Transaction as PrismaTransaction,
-        Review as PrismaReview
+        Review as PrismaReview,
+        Post as PrismaPost
        } from '@prisma/client';
 
 // Re-export the core types for use across the application
@@ -109,4 +110,13 @@ export interface ReportUserPayload {
     reason: string;
     details: string;
     attachmentUrl?: string; // Changed from File to URL string for API consistency
+}
+
+
+// Define the Post interface matching the select fields in the service
+export interface Post extends PrismaPost {
+    // No need to add custom fields unless they were added in the service map.
+    // If you add computed fields (like 'trendingScore') in the service, you'd add them here
+    // trendingScore?: number; 
+    // engagementScore?: number;
 }
