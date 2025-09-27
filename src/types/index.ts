@@ -172,5 +172,5 @@ export interface EssentialBackofficeSettings {
     enableFollowing:      Boolean;
     enableChats:          Boolean;
     enableCalling:        Boolean;
-    enableDisputes       Boolean;
+    enableDisputes:       Boolean;
 }
